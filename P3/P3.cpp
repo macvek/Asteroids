@@ -7,6 +7,18 @@
 
 using namespace std;
 
+Uint32 globalCustomEventId = 0;
+
+
+Uint32 tickMe(Uint32 interval, void* param) {
+	cout << "Tick" << endl;
+	SDL_Event e = {};
+	e.type = globalCustomEventId;
+
+	SDL_PushEvent( &e);
+	return interval;
+}
+
 int main(int argc, char* argv[])
 {
 	SDL_Surface* winSurface = NULL;
@@ -19,6 +31,15 @@ int main(int argc, char* argv[])
 		// End the program
 		return 1;
 	}
+
+	globalCustomEventId = SDL_RegisterEvents(1);
+	if ( ((Uint32)-1) == globalCustomEventId ) {
+		cout << "Failed to get registered event.." << endl;
+		return -1;
+	}
+
+	int registeredTimer = SDL_AddTimer(1000, tickMe, nullptr);
+	cout << "Registered timer at: " << registeredTimer << endl;
 
 	// Create our window
 	if (true) {
@@ -96,25 +117,53 @@ int main(int argc, char* argv[])
 		cout << "Mix_OpenAudio: " << SDL_GetError() << endl;
 	}
 	
-	Mix_Chunk* loadedWav = Mix_LoadWAV("C:/samples/CantinaBand3.wav");
+	Mix_Chunk* loadedWav = Mix_LoadWAV("C:/samples/CantinaBand60.wav");
 	if (nullptr == loadedWav) {
 		cout << "Mix_LoadWAV: " << SDL_GetError() << endl;
 	}
 	else {
 		Mix_QuerySpec(&audio_rate, &audio_format, &audio_channels);
 		cout << "Mix_QuerySpec: " << audio_rate <<" "<< audio_format<<" "<< audio_channels << endl;
-		Mix_PlayChannel(0, loadedWav, 0);
+
 	}
+
+	bool musicStarted = false;
+	bool paused = false;
 
 	// Wait
 	while (true) {
 		SDL_Event e;
 		if (SDL_WaitEvent(&e)) {
+			if (e.type == SDL_KEYDOWN /*|| e.type == SDL_KEYUP*/) {
+				SDL_KeyboardEvent* keyboardEvent = (SDL_KeyboardEvent*)(&e);
+				if (keyboardEvent->keysym.scancode == SDL_SCANCODE_RETURN) {
+					cout << "Return key pressed" << endl;
+
+					if (!musicStarted) {
+						Mix_PlayChannel(0, loadedWav, 0);
+						musicStarted = 1;
+					}
+					else {
+						if (paused) {
+							Mix_Resume(0);
+						}
+						else {
+							Mix_Pause(0);
+						}
+
+						paused = !paused;
+					}
+					
+					
+				}
+			}
 			if (e.type == SDL_QUIT) {
 				break;
 			}
 		}
-
+		if (e.type == globalCustomEventId) {
+			cout << "Custom event triggered" << endl;
+		}
 		cout << "Event type: " << e.type << endl;
 	}
 
