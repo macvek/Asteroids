@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <SDL.h>
+#include <SDL_mixer.h>
 
 using namespace std;
 
@@ -15,7 +16,6 @@ int main(int argc, char* argv[])
 	// Initialize SDL. SDL_Init will return -1 if it fails.
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		cout << "Error initializing SDL: " << SDL_GetError() << endl;
-		system("pause");
 		// End the program
 		return 1;
 	}
@@ -33,7 +33,6 @@ int main(int argc, char* argv[])
 	// Make sure creating the window succeeded
 	if (!window) {
 		cout << "Error creating window: " << SDL_GetError() << endl;
-		system("pause");
 		// End the program
 		return 1;
 	}
@@ -45,7 +44,6 @@ int main(int argc, char* argv[])
 		// Make sure getting the surface succeeded
 		if (!winSurface) {
 			cout << "Error getting surface: " << SDL_GetError() << endl;
-			system("pause");
 			// End the program
 			return 1;
 		}
@@ -65,7 +63,7 @@ int main(int argc, char* argv[])
 		cout << "Error getting renderer: " << SDL_GetError() << endl;
 	}
 	else {
-		if (SDL_SetRenderDrawColor(renderer, 127, 127, 127, SDL_ALPHA_OPAQUE)) {
+		if (SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE)) {
 			cout << "SDL_SetRenderDrawColor: " << SDL_GetError() << endl;
 		}
 
@@ -77,7 +75,8 @@ int main(int argc, char* argv[])
 		rect.y = 0;
 		rect.w = 100;
 		rect.h = 100;
-
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+		
 		if (SDL_RenderFillRect(renderer, &rect)) {
 			cout << "SDL_RenderFillRect: " << SDL_GetError() << endl;
 		}
@@ -85,8 +84,28 @@ int main(int argc, char* argv[])
 			cout << "SDL_RenderFlush: " << SDL_GetError() << endl;
 		}
 
+		SDL_RenderDrawLine(renderer, 100, 100, 200, 200);
+
 		SDL_RenderPresent(renderer);
 	}
+	int audio_rate = MIX_DEFAULT_FREQUENCY;
+	Uint16 audio_format = MIX_DEFAULT_FORMAT;
+	int audio_channels = MIX_DEFAULT_CHANNELS;
+
+	if (Mix_OpenAudio(audio_rate, audio_format, audio_channels, 4096)) {
+		cout << "Mix_OpenAudio: " << SDL_GetError() << endl;
+	}
+	
+	Mix_Chunk* loadedWav = Mix_LoadWAV("C:/samples/CantinaBand3.wav");
+	if (nullptr == loadedWav) {
+		cout << "Mix_LoadWAV: " << SDL_GetError() << endl;
+	}
+	else {
+		Mix_QuerySpec(&audio_rate, &audio_format, &audio_channels);
+		cout << "Mix_QuerySpec: " << audio_rate <<" "<< audio_format<<" "<< audio_channels << endl;
+		Mix_PlayChannel(0, loadedWav, 0);
+	}
+
 	// Wait
 	while (true) {
 		SDL_Event e;
