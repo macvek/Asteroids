@@ -38,6 +38,7 @@ int worldFrame = 0;
 double cursorX = 0;
 double cursorY = 0;
 double accScale = 0.05;
+double bulletScale = 10;
 
 typedef enum {
 	MoveLeft = 0,
@@ -67,6 +68,24 @@ DoublePoint identityPoint(DoublePoint p) {
 	return identityPoint(p.x, p.y);
 }
 
+DoublePoint identityPointingToCursor() {
+	return identityPoint(cursorX - player.f.pos.x, cursorY - player.f.pos.y);
+}
+
+double angleOfPoint(DoublePoint& p) {
+	return atan2(p.y, p.x);
+}
+
+void scaleDoublePoint(DoublePoint& p, double s) {
+	p.x *= s;
+	p.y *= s;
+}
+
+void applyMove(FloatingObject& f) {
+	f.pos.x += f.vel.x;
+	f.pos.y += f.vel.y;
+}
+
 Uint32 tickFrame(Uint32 interval, void* param) {
 	++worldFrame;
 	if (worldFrame % 30 == 0) {
@@ -77,16 +96,20 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 	e.type = globalCustomEventId;
 
 	if (pressedButtons[Accelerate]) {
-		auto velVector = identityPoint(cursorX - player.f.pos.x, cursorY - player.f.pos.y);
-
-
-
-		player.f.vel.x += velVector.x * accScale;
-		player.f.vel.y += velVector.y * accScale;
+		auto velVector = identityPointingToCursor();
+		scaleDoublePoint(velVector, accScale);
+		player.f.vel.x += velVector.x;
+		player.f.vel.y += velVector.y;
 	}
 
-	player.f.pos.x += player.f.vel.x;
-	player.f.pos.y += player.f.vel.y;
+	applyMove(player.f);
+
+	for (auto ptr = bullets.begin(); ptr < bullets.end(); ++ptr) {
+		if (ptr->lifetime > 0) {
+			--ptr->lifetime;
+			applyMove(ptr->f);
+		}
+	}
 
 	SDL_PushEvent( &e);
 	return interval;
@@ -156,6 +179,26 @@ struct Shape playerShape = {
 	playerShapePoints, 4
 };
 
+void renderShape(M33& toApply, struct Shape& shape) {
+	for (int i = 0; i < playerShape.pointsCount; i++) {
+		SDL_Point from = M33_Apply(toApply, playerShape.points[i]);
+		SDL_Point to = M33_Apply(toApply, playerShape.points[(i + 1) % playerShape.pointsCount]);
+
+		SDL_RenderDrawLine(renderer, from.x, from.y, to.x, to.y);
+	}
+}
+
+void renderShapeOfFloatingObject(struct FloatingObject& f, struct Shape& shape) {
+	M33 base;	M33_Identity(base);
+	M33 rotate; M33_Rotate(rotate, f.angle);
+	M33 t;		M33_Translate(t, f.pos.x, f.pos.y);
+
+	M33_Mult(base, t);
+	M33_Mult(base, rotate);
+
+	renderShape(base, shape);
+}
+
 void renderFrame() {
 	if (SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE)) {
 		cout << "SDL_SetRenderDrawColor: " << SDL_GetError() << endl;
@@ -164,24 +207,17 @@ void renderFrame() {
 	if (SDL_RenderClear(renderer)) {
 		cout << "SDL_RenderClear: " << SDL_GetError() << endl;
 	}
-	
-	double angle = atan2(cursorY - player.f.pos.y, cursorX - player.f.pos.x);
-
-	M33 base;	M33_Identity(base);
-	M33 rotate; M33_Rotate(rotate, angle);
-	M33 t;		M33_Translate(t, player.f.pos.x, player.f.pos.y);
-
-	M33_Mult(base, t);
-	M33_Mult(base, rotate);
-
-
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 
-	for (int i = 0; i < playerShape.pointsCount; i++) {
-		SDL_Point from = M33_Apply(base, playerShape.points[i]);
-		SDL_Point to = M33_Apply(base, playerShape.points[(i+1) % playerShape.pointsCount]);
+	auto directionVector = identityPointingToCursor();
+	player.f.angle = angleOfPoint(directionVector);
 
-		SDL_RenderDrawLine(renderer, from.x, from.y, to.x, to.y);
+	renderShapeOfFloatingObject(player.f, playerShape);
+
+	for (auto ptr = bullets.begin(); ptr < bullets.end(); ++ptr) {
+		if (ptr->lifetime > 0) {
+			renderShapeOfFloatingObject(ptr->f, playerShape);
+		}
 	}
 
 	SDL_RenderPresent(renderer);
@@ -189,8 +225,14 @@ void renderFrame() {
 
 void triggerFire() {
 	struct Bullet b;
-	b.lifetime = 500;
+	b.lifetime = 200;
 	b.f = player.f;
+	
+	auto directionVector = identityPointingToCursor();
+	scaleDoublePoint(directionVector, bulletScale);
+
+	b.f.vel.x += directionVector.x;
+	b.f.vel.y += directionVector.y;
 
 
 	bullets.push_back(b);
