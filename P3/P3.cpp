@@ -9,14 +9,16 @@
 
 using namespace std;
 
-struct Shape {
-	SDL_Point *points;
-	int pointsCount;
+struct DoublePoint {
+	double x, y;
 };
 
-struct DoublePoint {
-	double x,y;
+struct Shape {
+	DoublePoint *points;
+	int pointsCount;
+	double range;
 };
+
 
 struct FloatingObject {
 	double angle;
@@ -33,10 +35,12 @@ vector<struct Bullet> bullets;
 
 Uint32 globalCustomEventId = 0;
 
+double SCREEN_WIDTH = 800;
+double SCREEN_HEIGHT = 600;
+
 int worldFrame = 0;
 
-double cursorX = 0;
-double cursorY = 0;
+DoublePoint directionVector;
 double accScale = 0.05;
 double bulletScale = 10;
 
@@ -56,20 +60,21 @@ struct Player {
 	struct FloatingObject f;
 } player;
 
-
+double vectorLength(DoublePoint& p) {
+	return sqrt(p.x * p.x + p.y * p.y);
+}
 
 DoublePoint identityPoint(double x, double y) {
 	double len = sqrt(x * x + y * y);
 	return DoublePoint{ x / len, y / len };
 }
 
-
 DoublePoint identityPoint(DoublePoint p) {
 	return identityPoint(p.x, p.y);
 }
 
-DoublePoint identityPointingToCursor() {
-	return identityPoint(cursorX - player.f.pos.x, cursorY - player.f.pos.y);
+DoublePoint identityPointingTo(double x, double y) {
+	return identityPoint(x- player.f.pos.x, y - player.f.pos.y);
 }
 
 double angleOfPoint(DoublePoint& p) {
@@ -84,6 +89,21 @@ void scaleDoublePoint(DoublePoint& p, double s) {
 void applyMove(FloatingObject& f) {
 	f.pos.x += f.vel.x;
 	f.pos.y += f.vel.y;
+
+	if (f.pos.x < 0) {
+		f.pos.x += SCREEN_WIDTH;
+	}
+	else if (f.pos.x > SCREEN_WIDTH) {
+		f.pos.x -= SCREEN_WIDTH;
+	}
+
+	if (f.pos.y < 0) {
+		f.pos.y += SCREEN_HEIGHT;
+	}
+	else if (f.pos.y > SCREEN_HEIGHT) {
+		f.pos.y -= SCREEN_HEIGHT;
+	}
+
 }
 
 Uint32 tickFrame(Uint32 interval, void* param) {
@@ -96,7 +116,7 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 	e.type = globalCustomEventId;
 
 	if (pressedButtons[Accelerate]) {
-		auto velVector = identityPointingToCursor();
+		auto velVector = directionVector;
 		scaleDoublePoint(velVector, accScale);
 		player.f.vel.x += velVector.x;
 		player.f.vel.y += velVector.y;
@@ -168,7 +188,7 @@ void M33_Mult(M33& s, M33& o) {
 	M33_Copy(r, s);
 }
 
-SDL_Point M33_Apply(M33& m, SDL_Point& p) {
+SDL_Point M33_Apply(M33& m, DoublePoint& p) {
 	int nX = m.m[0][0] * p.x + m.m[0][1] * p.y + m.m[0][2];
 	int nY = m.m[1][0] * p.x + m.m[1][1] * p.y + m.m[1][2];
 
@@ -181,15 +201,15 @@ void M33_Print(M33& m) {
 	cout << " [ " << m.m[2][0] << "\t" << m.m[2][1] << "\t" << m.m[2][2] << " ] " << endl;
 }
 
-SDL_Point playerShapePoints[] = {
+DoublePoint playerShapePoints[] = {
 	{-10,-10}, {10,-2}, {10,2}, {-10,10}
 };
 
 struct Shape playerShape = {
-	playerShapePoints, 4
+	playerShapePoints, 4, 
 };
 
-SDL_Point bulletShapePoints[] = {
+DoublePoint bulletShapePoints[] = {
 	{-4,-2}, {4,-2}, {4,2}, {-4,2}
 };
 
@@ -227,9 +247,6 @@ void renderFrame() {
 	}
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 
-	auto directionVector = identityPointingToCursor();
-	player.f.angle = angleOfPoint(directionVector);
-
 	renderShapeOfFloatingObject(player.f, playerShape);
 
 	for (auto ptr = bullets.begin(); ptr < bullets.end(); ++ptr) {
@@ -246,18 +263,30 @@ void triggerFire() {
 	b.lifetime = 200;
 	b.f = player.f;
 	
-	auto directionVector = identityPointingToCursor();
-	scaleDoublePoint(directionVector, bulletScale);
+	auto velVector = directionVector;
+	scaleDoublePoint(velVector, bulletScale);
 
-	b.f.vel.x += directionVector.x;
-	b.f.vel.y += directionVector.y;
+	b.f.vel.x += velVector.x;
+	b.f.vel.y += velVector.y;
 
 
 	bullets.push_back(b);
 }
 
+void updateShapeRange(struct Shape &s) {
+	double maxdist = 0;
+	for (int i = 0; i < s.pointsCount; i++) {
+		maxdist = max<double>(maxdist, vectorLength(s.points[i]));
+	}
+
+	s.range = maxdist;
+}
+
 int main(int argc, char* argv[])
 {
+	updateShapeRange(playerShape);
+	updateShapeRange(bulletShape);
+
 	player.f.pos.x = 500;
 	player.f.pos.y = 500;
 
@@ -275,7 +304,7 @@ int main(int argc, char* argv[])
 	int registeredTimer = SDL_AddTimer(15, tickFrame, nullptr);
 	cout << "Registered timer at: " << registeredTimer << endl;
 	
-	window = SDL_CreateWindow("Example", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, 0);
+	window = SDL_CreateWindow("Example", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
 
 	if (nullptr == window) {
 		cout << "Error creating window: " << SDL_GetError() << endl;
@@ -326,8 +355,9 @@ int main(int argc, char* argv[])
 			else if (e.type == SDL_MOUSEMOTION) {
 				SDL_MouseMotionEvent* mouseMotionEvent = (SDL_MouseMotionEvent*)(&e);
 				cout << "Mx: " << mouseMotionEvent->x << " My: " << mouseMotionEvent->y << " dMx: " << mouseMotionEvent->xrel << " dMy: " << " dMx: " <<  mouseMotionEvent->yrel << endl;
-				cursorX = mouseMotionEvent->x;
-				cursorY = mouseMotionEvent->y;
+
+				directionVector = identityPointingTo(mouseMotionEvent->x, mouseMotionEvent->y);
+				player.f.angle = angleOfPoint(directionVector);
 			}
 			else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 				SDL_KeyboardEvent* keyboardEvent = (SDL_KeyboardEvent*)(&e);
