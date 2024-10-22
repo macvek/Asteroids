@@ -12,6 +12,19 @@ Uint32 globalCustomEventId = 0;
 
 int worldFrame = 0;
 
+int entityX = 500;
+int entityY = 500;
+
+typedef enum {
+	MoveLeft = 0,
+	MoveRight,
+	MoveUp,
+	MoveDown,
+	ActionButtonCount
+
+} ACTION_BUTTONS;
+
+bool pressedButtons[ActionButtonCount] = {};
 
 Uint32 tickFrame(Uint32 interval, void* param) {
 	++worldFrame;
@@ -21,6 +34,11 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 	
 	SDL_Event e = {};
 	e.type = globalCustomEventId;
+
+	if (pressedButtons[MoveUp]) --entityY;
+	if (pressedButtons[MoveDown]) ++entityY;
+	if (pressedButtons[MoveRight]) ++entityX;
+	if (pressedButtons[MoveLeft]) --entityX;
 
 	SDL_PushEvent( &e);
 	return interval;
@@ -94,14 +112,12 @@ void renderFrame() {
 	if (SDL_RenderClear(renderer)) {
 		cout << "SDL_RenderClear: " << SDL_GetError() << endl;
 	}
-	SDL_Rect rect;
 	
-	double angle = atan2(pY - 500, pX - 500);
+	double angle = atan2(pY - entityY, pX - entityX);
 
 	M33 base;	M33_Identity(base);
 	M33 rotate; M33_Rotate(rotate, angle);
-	M33 t;		M33_Translate(t, 500, 500);
-	
+	M33 t;		M33_Translate(t, entityX, entityY);
 	
 	M33_Mult(base, t);
 	M33_Mult(base, rotate);
@@ -185,13 +201,14 @@ int main(int argc, char* argv[])
 				pX = mouseMotionEvent->x;
 				pY = mouseMotionEvent->y;
 			}
-			else if (e.type == SDL_KEYDOWN /*|| e.type == SDL_KEYUP*/) {
+			else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 				SDL_KeyboardEvent* keyboardEvent = (SDL_KeyboardEvent*)(&e);
-				if (keyboardEvent->keysym.scancode == SDL_SCANCODE_ESCAPE) {
+				auto key = keyboardEvent->keysym.scancode;
+				if (key == SDL_SCANCODE_ESCAPE) {
 					break;
 				}
 
-				if (keyboardEvent->keysym.scancode == SDL_SCANCODE_RETURN) {
+				if (key == SDL_SCANCODE_RETURN && e.type == SDL_KEYDOWN) {
 					cout << "Return key pressed" << endl;
 
 					if (!musicStarted) {
@@ -209,7 +226,18 @@ int main(int argc, char* argv[])
 						paused = !paused;
 					}
 				}
-				renderFrame();
+				else if (key == SDL_SCANCODE_LEFT) {
+					pressedButtons[MoveLeft] = e.type == SDL_KEYDOWN;
+				}
+				else if (key == SDL_SCANCODE_RIGHT) {
+					pressedButtons[MoveRight] = e.type == SDL_KEYDOWN;
+				}
+				else if (key == SDL_SCANCODE_UP) {
+					pressedButtons[MoveUp] = e.type == SDL_KEYDOWN;
+				}
+				else if (key == SDL_SCANCODE_DOWN) {
+					pressedButtons[MoveDown] = e.type == SDL_KEYDOWN;
+				}
 			}
 			else if (e.type == SDL_QUIT) {
 				break;
