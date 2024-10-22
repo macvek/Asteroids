@@ -1,6 +1,3 @@
-// P3.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
 #include <iostream>
 #include <cmath>
 #include <SDL.h>
@@ -22,16 +19,25 @@ struct Shape {
 
 struct FloatingObject {
 	double angle;
-	struct DoublePoint pos;
-	struct DoublePoint vel;
+	DoublePoint pos;
+	DoublePoint vel;
+	Shape* shape;
+};
+
+struct ReflectedObject {
+	FloatingObject* parent;
+	bool flipX;
+	bool flipY;
+	bool active;
 };
 
 struct Bullet {
-	struct FloatingObject f;
+	FloatingObject f;
 	int lifetime;
 };
 
-vector<struct Bullet> bullets;
+vector<Bullet> bullets;
+vector<Bullet> a;
 
 Uint32 globalCustomEventId = 0;
 
@@ -57,7 +63,7 @@ typedef enum {
 bool pressedButtons[ActionButtonCount] = {};
 
 struct Player {
-	struct FloatingObject f;
+	FloatingObject f;
 } player;
 
 double vectorLength(DoublePoint& p) {
@@ -149,9 +155,9 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 
-typedef struct M33 {
+struct M33 {
 	double m[3][3];
-} M33;
+};
 
 void M33_Identity(M33& m) {
 	m.m[0][0] = 1; m.m[0][1] = 0; m.m[0][2] = 0;
@@ -189,10 +195,10 @@ void M33_Mult(M33& s, M33& o) {
 }
 
 SDL_Point M33_Apply(M33& m, DoublePoint& p) {
-	int nX = m.m[0][0] * p.x + m.m[0][1] * p.y + m.m[0][2];
-	int nY = m.m[1][0] * p.x + m.m[1][1] * p.y + m.m[1][2];
+	double nX = m.m[0][0] * p.x + m.m[0][1] * p.y + m.m[0][2];
+	double nY = m.m[1][0] * p.x + m.m[1][1] * p.y + m.m[1][2];
 
-	return SDL_Point{ nX, nY };
+	return SDL_Point{ (int)floor(nX), (int)floor(nY) };
 }
 
 void M33_Print(M33& m) {
@@ -205,7 +211,7 @@ DoublePoint playerShapePoints[] = {
 	{-10,-10}, {10,-2}, {10,2}, {-10,10}
 };
 
-struct Shape playerShape = {
+Shape playerShape = {
 	playerShapePoints, 4, 
 };
 
@@ -213,11 +219,11 @@ DoublePoint bulletShapePoints[] = {
 	{-4,-2}, {4,-2}, {4,2}, {-4,2}
 };
 
-struct Shape bulletShape = {
+Shape bulletShape = {
 	bulletShapePoints, 4
 };
 
-void renderShape(M33& toApply, struct Shape& shape) {
+void renderShape(M33& toApply, Shape& shape) {
 	for (int i = 0; i < shape.pointsCount; i++) {
 		SDL_Point from = M33_Apply(toApply, shape.points[i]);
 		SDL_Point to = M33_Apply(toApply, shape.points[(i + 1) % shape.pointsCount]);
@@ -226,7 +232,7 @@ void renderShape(M33& toApply, struct Shape& shape) {
 	}
 }
 
-void renderShapeOfFloatingObject(struct FloatingObject& f, struct Shape& shape) {
+void renderShapeOfFloatingObject(FloatingObject& f) {
 	M33 base;	M33_Identity(base);
 	M33 rotate; M33_Rotate(rotate, f.angle);
 	M33 t;		M33_Translate(t, f.pos.x, f.pos.y);
@@ -234,7 +240,7 @@ void renderShapeOfFloatingObject(struct FloatingObject& f, struct Shape& shape) 
 	M33_Mult(base, t);
 	M33_Mult(base, rotate);
 
-	renderShape(base, shape);
+	renderShape(base, *f.shape);
 }
 
 void renderFrame() {
@@ -247,11 +253,11 @@ void renderFrame() {
 	}
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 
-	renderShapeOfFloatingObject(player.f, playerShape);
+	renderShapeOfFloatingObject(player.f);
 
 	for (auto ptr = bullets.begin(); ptr < bullets.end(); ++ptr) {
 		if (ptr->lifetime > 0) {
-			renderShapeOfFloatingObject(ptr->f, bulletShape);
+			renderShapeOfFloatingObject(ptr->f);
 		}
 	}
 
@@ -259,10 +265,11 @@ void renderFrame() {
 }
 
 void triggerFire() {
-	struct Bullet b;
+	Bullet b;
 	b.lifetime = 200;
 	b.f = player.f;
-	
+	b.f.shape = &bulletShape;
+
 	auto velVector = directionVector;
 	scaleDoublePoint(velVector, bulletScale);
 
@@ -273,7 +280,7 @@ void triggerFire() {
 	bullets.push_back(b);
 }
 
-void updateShapeRange(struct Shape &s) {
+void updateShapeRange(Shape &s) {
 	double maxdist = 0;
 	for (int i = 0; i < s.pointsCount; i++) {
 		maxdist = max<double>(maxdist, vectorLength(s.points[i]));
@@ -287,8 +294,9 @@ int main(int argc, char* argv[])
 	updateShapeRange(playerShape);
 	updateShapeRange(bulletShape);
 
-	player.f.pos.x = 500;
-	player.f.pos.y = 500;
+	player.f.pos.x = 400;
+	player.f.pos.y = 300;
+	player.f.shape = &playerShape;
 
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		cout << "Error initializing SDL: " << SDL_GetError() << endl;
@@ -304,7 +312,7 @@ int main(int argc, char* argv[])
 	int registeredTimer = SDL_AddTimer(15, tickFrame, nullptr);
 	cout << "Registered timer at: " << registeredTimer << endl;
 	
-	window = SDL_CreateWindow("Example", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+	window = SDL_CreateWindow("Example", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (int)SCREEN_WIDTH, (int)SCREEN_HEIGHT, 0);
 
 	if (nullptr == window) {
 		cout << "Error creating window: " << SDL_GetError() << endl;
