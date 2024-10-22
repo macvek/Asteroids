@@ -24,20 +24,12 @@ struct FloatingObject {
 	Shape* shape;
 };
 
-struct ReflectedObject {
-	FloatingObject* parent;
-	bool flipX;
-	bool flipY;
-	bool active;
-};
-
 struct Bullet {
 	FloatingObject f;
 	int lifetime;
 };
 
 vector<Bullet> bullets;
-vector<Bullet> a;
 
 Uint32 globalCustomEventId = 0;
 
@@ -232,15 +224,45 @@ void renderShape(M33& toApply, Shape& shape) {
 	}
 }
 
+void renderShapeWithOffset(Shape& s, M33& base, double offX, double offY) {
+	M33 flipOffset;
+	M33_Translate(flipOffset, offX, offY);
+
+	M33_Mult(flipOffset, base);
+	renderShape(flipOffset, s);
+}
+
 void renderShapeOfFloatingObject(FloatingObject& f) {
 	M33 base;	M33_Identity(base);
 	M33 rotate; M33_Rotate(rotate, f.angle);
 	M33 t;		M33_Translate(t, f.pos.x, f.pos.y);
-
+	
 	M33_Mult(base, t);
 	M33_Mult(base, rotate);
 
 	renderShape(base, *f.shape);
+
+	double xOffset = 0;
+	double yOffset = 0;
+
+	if (f.pos.x < f.shape->range) xOffset = SCREEN_WIDTH;
+	else if (f.pos.x > SCREEN_WIDTH - f.shape->range) xOffset = -SCREEN_WIDTH;
+
+	if (f.pos.y < f.shape->range) yOffset = SCREEN_HEIGHT;
+	else if (f.pos.y > SCREEN_HEIGHT - f.shape->range) yOffset = -SCREEN_HEIGHT;
+
+	if (xOffset != 0) {
+		renderShapeWithOffset(*f.shape, base, xOffset, 0);
+	}
+
+	if (yOffset != 0) {
+		renderShapeWithOffset(*f.shape, base, 0, yOffset);
+	}
+
+	if (xOffset != 0 && yOffset != 0) {
+		renderShapeWithOffset(*f.shape, base, xOffset, yOffset);
+	}
+
 }
 
 void renderFrame() {
