@@ -5,6 +5,7 @@
 #include <cmath>
 #include <SDL.h>
 #include <SDL_mixer.h>
+#include <vector>
 
 using namespace std;
 
@@ -13,23 +14,58 @@ struct Shape {
 	int pointsCount;
 };
 
+struct DoublePoint {
+	double x,y;
+};
+
+struct FloatingObject {
+	double angle;
+	struct DoublePoint pos;
+	struct DoublePoint vel;
+};
+
+struct Bullet {
+	struct FloatingObject f;
+	int lifetime;
+};
+
+vector<struct Bullet> bullets;
+
 Uint32 globalCustomEventId = 0;
 
 int worldFrame = 0;
 
-int entityX = 500;
-int entityY = 500;
+double cursorX = 0;
+double cursorY = 0;
+double accScale = 0.05;
 
 typedef enum {
 	MoveLeft = 0,
 	MoveRight,
 	MoveUp,
 	MoveDown,
+	Accelerate,
 	ActionButtonCount
 
 } ACTION_BUTTONS;
 
 bool pressedButtons[ActionButtonCount] = {};
+
+struct Player {
+	struct FloatingObject f;
+} player;
+
+
+
+DoublePoint identityPoint(double x, double y) {
+	double len = sqrt(x * x + y * y);
+	return DoublePoint{ x / len, y / len };
+}
+
+
+DoublePoint identityPoint(DoublePoint p) {
+	return identityPoint(p.x, p.y);
+}
 
 Uint32 tickFrame(Uint32 interval, void* param) {
 	++worldFrame;
@@ -40,10 +76,17 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 	SDL_Event e = {};
 	e.type = globalCustomEventId;
 
-	if (pressedButtons[MoveUp]) --entityY;
-	if (pressedButtons[MoveDown]) ++entityY;
-	if (pressedButtons[MoveRight]) ++entityX;
-	if (pressedButtons[MoveLeft]) --entityX;
+	if (pressedButtons[Accelerate]) {
+		auto velVector = identityPoint(cursorX - player.f.pos.x, cursorY - player.f.pos.y);
+
+
+
+		player.f.vel.x += velVector.x * accScale;
+		player.f.vel.y += velVector.y * accScale;
+	}
+
+	player.f.pos.x += player.f.vel.x;
+	player.f.pos.y += player.f.vel.y;
 
 	SDL_PushEvent( &e);
 	return interval;
@@ -104,9 +147,6 @@ void M33_Print(M33& m) {
 	cout << " [ " << m.m[2][0] << "\t" << m.m[2][1] << "\t" << m.m[2][2] << " ] " << endl;
 }
 
-int pX = 0;
-int pY = 0;
-
 
 SDL_Point playerShapePoints[] = {
 	{-10,-10}, {10,-2}, {10,2}, {-10,10}
@@ -125,11 +165,11 @@ void renderFrame() {
 		cout << "SDL_RenderClear: " << SDL_GetError() << endl;
 	}
 	
-	double angle = atan2(pY - entityY, pX - entityX);
+	double angle = atan2(cursorY - player.f.pos.y, cursorX - player.f.pos.x);
 
 	M33 base;	M33_Identity(base);
 	M33 rotate; M33_Rotate(rotate, angle);
-	M33 t;		M33_Translate(t, entityX, entityY);
+	M33 t;		M33_Translate(t, player.f.pos.x, player.f.pos.y);
 
 	M33_Mult(base, t);
 	M33_Mult(base, rotate);
@@ -147,14 +187,22 @@ void renderFrame() {
 	SDL_RenderPresent(renderer);
 }
 
+void triggerFire() {
+	struct Bullet b;
+	b.lifetime = 500;
+	b.f = player.f;
 
+
+	bullets.push_back(b);
+}
 
 int main(int argc, char* argv[])
 {
-	// Initialize SDL. SDL_Init will return -1 if it fails.
+	player.f.pos.x = 500;
+	player.f.pos.y = 500;
+
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		cout << "Error initializing SDL: " << SDL_GetError() << endl;
-		// End the program
 		return 1;
 	}
 
@@ -204,11 +252,22 @@ int main(int argc, char* argv[])
 	SDL_Event e;
 	for (;;) {
 		if (SDL_WaitEvent(&e)) {
-			if (e.type == SDL_MOUSEMOTION) {
+			if (e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
+				SDL_MouseButtonEvent* mouseButtonEvent= (SDL_MouseButtonEvent*)(&e);
+				if (1 == mouseButtonEvent->button && e.type == SDL_MOUSEBUTTONDOWN) {
+					triggerFire();
+				}
+
+				if (3 == mouseButtonEvent->button) {
+					pressedButtons[Accelerate] = e.type == SDL_MOUSEBUTTONDOWN;
+				}
+			}
+
+			else if (e.type == SDL_MOUSEMOTION) {
 				SDL_MouseMotionEvent* mouseMotionEvent = (SDL_MouseMotionEvent*)(&e);
 				cout << "Mx: " << mouseMotionEvent->x << " My: " << mouseMotionEvent->y << " dMx: " << mouseMotionEvent->xrel << " dMy: " << " dMx: " <<  mouseMotionEvent->yrel << endl;
-				pX = mouseMotionEvent->x;
-				pY = mouseMotionEvent->y;
+				cursorX = mouseMotionEvent->x;
+				cursorY = mouseMotionEvent->y;
 			}
 			else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 				SDL_KeyboardEvent* keyboardEvent = (SDL_KeyboardEvent*)(&e);
@@ -262,26 +321,11 @@ int main(int argc, char* argv[])
 			cout << "SDL_WaitEvent: " << SDL_GetError() << endl;
 			break;
 		}
-		
-		
 	}
 
 	SDL_DestroyWindow(window);
-
-	// Quit SDL
 	SDL_Quit();
 
-	// End the program
 	return 0;
 }
 
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
