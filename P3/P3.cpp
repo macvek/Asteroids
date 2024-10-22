@@ -2,7 +2,7 @@
 //
 
 #include <iostream>
-#include <math.h>
+#include <cmath>
 #include <SDL.h>
 #include <SDL_mixer.h>
 
@@ -69,7 +69,6 @@ void M33_Mult(M33& s, M33& o) {
 }
 
 
-
 SDL_Point M33_Apply(M33& m, SDL_Point& p) {
 	int nX = m.m[0][0] * p.x + m.m[0][1] * p.y + m.m[0][2];
 	int nY = m.m[1][0] * p.x + m.m[1][1] * p.y + m.m[1][2];
@@ -83,9 +82,10 @@ void M33_Print(M33& m) {
 	cout << " [ " << m.m[2][0] << "\t" << m.m[2][1] << "\t" << m.m[2][2] << " ] " << endl;
 }
 
-bool printOnce = true;
-void renderFrame() {
+int pX = 0;
+int pY = 0;
 
+void renderFrame() {
 
 	if (SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE)) {
 		cout << "SDL_SetRenderDrawColor: " << SDL_GetError() << endl;
@@ -96,22 +96,18 @@ void renderFrame() {
 	}
 	SDL_Rect rect;
 	
+	double angle = atan2(pY - 500, pX - 500);
+
 	M33 base;	M33_Identity(base);
-	M33 rotate; M33_Rotate(rotate, M_PI + 0.01*worldFrame);
+	M33 rotate; M33_Rotate(rotate, angle);
 	M33 t;		M33_Translate(t, 500, 500);
 	
-	if (printOnce) M33_Print(base);
+	
 	M33_Mult(base, t);
 	M33_Mult(base, rotate);
-	if (printOnce) 	M33_Print(base);
-
-	printOnce = false;
-	//
-
 	
-
 	SDL_Point points[] = {
-		{-50,-50}, {50,-50}, {50,50}, {-50,50}
+		{-50,-50}, {50,-5}, {50,5}, {-50,50}
 	};
 	
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
@@ -125,6 +121,8 @@ void renderFrame() {
 
 	SDL_RenderPresent(renderer);
 }
+
+
 
 int main(int argc, char* argv[])
 {
@@ -181,12 +179,18 @@ int main(int argc, char* argv[])
 	SDL_Event e;
 	for (;;) {
 		if (SDL_WaitEvent(&e)) {
-			if (e.type == SDL_KEYDOWN /*|| e.type == SDL_KEYUP*/) {
+			if (e.type == SDL_MOUSEMOTION) {
+				SDL_MouseMotionEvent* mouseMotionEvent = (SDL_MouseMotionEvent*)(&e);
+				cout << "Mx: " << mouseMotionEvent->x << " My: " << mouseMotionEvent->y << " dMx: " << mouseMotionEvent->xrel << " dMy: " << " dMx: " <<  mouseMotionEvent->yrel << endl;
+				pX = mouseMotionEvent->x;
+				pY = mouseMotionEvent->y;
+			}
+			else if (e.type == SDL_KEYDOWN /*|| e.type == SDL_KEYUP*/) {
 				SDL_KeyboardEvent* keyboardEvent = (SDL_KeyboardEvent*)(&e);
 				if (keyboardEvent->keysym.scancode == SDL_SCANCODE_ESCAPE) {
 					break;
 				}
-				
+
 				if (keyboardEvent->keysym.scancode == SDL_SCANCODE_RETURN) {
 					cout << "Return key pressed" << endl;
 
@@ -207,16 +211,22 @@ int main(int argc, char* argv[])
 				}
 				renderFrame();
 			}
-			if (e.type == SDL_QUIT) {
+			else if (e.type == SDL_QUIT) {
 				break;
 			}
-		}
-		if (e.type == globalCustomEventId) {
-			renderFrame();
+			else if (e.type == globalCustomEventId) {
+				renderFrame();
+			}
+			else {
+				cout << "Not handled event type: " << e.type << endl;
+			}
 		}
 		else {
-			cout << "Event type: " << e.type << endl;
+			cout << "SDL_WaitEvent: " << SDL_GetError() << endl;
+			break;
 		}
+		
+		
 	}
 
 	SDL_DestroyWindow(window);
