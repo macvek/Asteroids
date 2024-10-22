@@ -8,6 +8,11 @@
 
 using namespace std;
 
+struct Shape {
+	SDL_Point *points;
+	int pointsCount;
+};
+
 Uint32 globalCustomEventId = 0;
 
 int worldFrame = 0;
@@ -86,7 +91,6 @@ void M33_Mult(M33& s, M33& o) {
 	M33_Copy(r, s);
 }
 
-
 SDL_Point M33_Apply(M33& m, SDL_Point& p) {
 	int nX = m.m[0][0] * p.x + m.m[0][1] * p.y + m.m[0][2];
 	int nY = m.m[1][0] * p.x + m.m[1][1] * p.y + m.m[1][2];
@@ -103,8 +107,16 @@ void M33_Print(M33& m) {
 int pX = 0;
 int pY = 0;
 
-void renderFrame() {
 
+SDL_Point playerShapePoints[] = {
+	{-10,-10}, {10,-2}, {10,2}, {-10,10}
+};
+
+struct Shape playerShape = {
+	playerShapePoints, 4
+};
+
+void renderFrame() {
 	if (SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE)) {
 		cout << "SDL_SetRenderDrawColor: " << SDL_GetError() << endl;
 	}
@@ -118,19 +130,16 @@ void renderFrame() {
 	M33 base;	M33_Identity(base);
 	M33 rotate; M33_Rotate(rotate, angle);
 	M33 t;		M33_Translate(t, entityX, entityY);
-	
+
 	M33_Mult(base, t);
 	M33_Mult(base, rotate);
-	
-	SDL_Point points[] = {
-		{-50,-50}, {50,-5}, {50,5}, {-50,50}
-	};
-	
+
+
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 
-	for (int i = 0; i < 4; i++) {
-		SDL_Point from = M33_Apply(base, points[i]);
-		SDL_Point to = M33_Apply(base, points[(i+1) % 4]);
+	for (int i = 0; i < playerShape.pointsCount; i++) {
+		SDL_Point from = M33_Apply(base, playerShape.points[i]);
+		SDL_Point to = M33_Apply(base, playerShape.points[(i+1) % playerShape.pointsCount]);
 
 		SDL_RenderDrawLine(renderer, from.x, from.y, to.x, to.y);
 	}
