@@ -111,6 +111,17 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 		}
 	}
 
+	auto lastToDrop = bullets.begin();
+
+	for (; lastToDrop < bullets.end(); ++lastToDrop) {
+		if (lastToDrop->lifetime > 0) {
+			break;
+		}
+	}
+
+	bullets.erase(bullets.begin(), lastToDrop);
+
+
 	SDL_PushEvent( &e);
 	return interval;
 }
@@ -170,7 +181,6 @@ void M33_Print(M33& m) {
 	cout << " [ " << m.m[2][0] << "\t" << m.m[2][1] << "\t" << m.m[2][2] << " ] " << endl;
 }
 
-
 SDL_Point playerShapePoints[] = {
 	{-10,-10}, {10,-2}, {10,2}, {-10,10}
 };
@@ -179,10 +189,18 @@ struct Shape playerShape = {
 	playerShapePoints, 4
 };
 
+SDL_Point bulletShapePoints[] = {
+	{-4,-2}, {4,-2}, {4,2}, {-4,2}
+};
+
+struct Shape bulletShape = {
+	bulletShapePoints, 4
+};
+
 void renderShape(M33& toApply, struct Shape& shape) {
-	for (int i = 0; i < playerShape.pointsCount; i++) {
-		SDL_Point from = M33_Apply(toApply, playerShape.points[i]);
-		SDL_Point to = M33_Apply(toApply, playerShape.points[(i + 1) % playerShape.pointsCount]);
+	for (int i = 0; i < shape.pointsCount; i++) {
+		SDL_Point from = M33_Apply(toApply, shape.points[i]);
+		SDL_Point to = M33_Apply(toApply, shape.points[(i + 1) % shape.pointsCount]);
 
 		SDL_RenderDrawLine(renderer, from.x, from.y, to.x, to.y);
 	}
@@ -216,7 +234,7 @@ void renderFrame() {
 
 	for (auto ptr = bullets.begin(); ptr < bullets.end(); ++ptr) {
 		if (ptr->lifetime > 0) {
-			renderShapeOfFloatingObject(ptr->f, playerShape);
+			renderShapeOfFloatingObject(ptr->f, bulletShape);
 		}
 	}
 
