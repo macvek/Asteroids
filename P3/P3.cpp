@@ -3,6 +3,7 @@
 #include <SDL.h>
 #include <SDL_mixer.h>
 #include <vector>
+#include <cstdlib>
 
 using namespace std;
 
@@ -29,7 +30,14 @@ struct Bullet {
 	int lifetime;
 };
 
+struct Asteroid {
+	FloatingObject f;
+	int level;
+	double aVel;
+};
+
 vector<Bullet> bullets;
+vector<Asteroid> asteroids;
 
 Uint32 globalCustomEventId = 0;
 
@@ -129,6 +137,11 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 		}
 	}
 
+	for (auto ptr = asteroids.begin(); ptr < asteroids.end(); ++ptr) {
+		ptr->f.angle += ptr->aVel;
+		applyMove(ptr->f);
+	}
+
 	auto lastToDrop = bullets.begin();
 
 	for (; lastToDrop < bullets.end(); ++lastToDrop) {
@@ -186,11 +199,11 @@ void M33_Mult(M33& s, M33& o) {
 	M33_Copy(r, s);
 }
 
-SDL_Point M33_Apply(M33& m, DoublePoint& p) {
+DoublePoint M33_Apply(M33& m, DoublePoint& p) {
 	double nX = m.m[0][0] * p.x + m.m[0][1] * p.y + m.m[0][2];
 	double nY = m.m[1][0] * p.x + m.m[1][1] * p.y + m.m[1][2];
 
-	return SDL_Point{ (int)floor(nX), (int)floor(nY) };
+	return DoublePoint{ nX, nY };
 }
 
 void M33_Print(M33& m) {
@@ -217,10 +230,10 @@ Shape bulletShape = {
 
 void renderShape(M33& toApply, Shape& shape) {
 	for (int i = 0; i < shape.pointsCount; i++) {
-		SDL_Point from = M33_Apply(toApply, shape.points[i]);
-		SDL_Point to = M33_Apply(toApply, shape.points[(i + 1) % shape.pointsCount]);
+		DoublePoint from = M33_Apply(toApply, shape.points[i]);
+		DoublePoint to = M33_Apply(toApply, shape.points[(i + 1) % shape.pointsCount]);
 
-		SDL_RenderDrawLine(renderer, from.x, from.y, to.x, to.y);
+		SDL_RenderDrawLine(renderer, (int)floor(from.x), (int)floor(from.y), (int)floor(to.x), (int)floor(to.y));
 	}
 }
 
@@ -283,12 +296,16 @@ void renderFrame() {
 		}
 	}
 
+	for (auto ptr = asteroids.begin(); ptr < asteroids.end(); ++ptr) {
+		renderShapeOfFloatingObject(ptr->f);
+	}
+
 	SDL_RenderPresent(renderer);
 }
 
 void triggerFire() {
 	Bullet b;
-	b.lifetime = 200;
+	b.lifetime = 50;
 	b.f = player.f;
 	b.f.shape = &bulletShape;
 
@@ -298,11 +315,10 @@ void triggerFire() {
 	b.f.vel.x += velVector.x;
 	b.f.vel.y += velVector.y;
 
-
 	bullets.push_back(b);
 }
 
-void updateShapeRange(Shape &s) {
+void updateShapeRange(Shape& s) {
 	double maxdist = 0;
 	for (int i = 0; i < s.pointsCount; i++) {
 		maxdist = max<double>(maxdist, vectorLength(s.points[i]));
@@ -311,14 +327,98 @@ void updateShapeRange(Shape &s) {
 	s.range = maxdist;
 }
 
+Shape* generateAsteroidShape(int count, int baseSize, int sizeRange) {
+	Shape *s = new Shape;
+	
+	s->pointsCount = count;
+	s->points = new DoublePoint[count];
+	double angle = M_PI / count * 2;
+	M33 rotate; 
+	
+	DoublePoint p;
+	double maxX = 0, minX = 0, maxY = 0, minY = 0;
+	for (int i=0;i<count;++i) {
+		p.y = 0;
+		p.x = baseSize + (rand() % sizeRange);
+		M33_Rotate(rotate, angle*i);
+
+		s->points[i] = M33_Apply(rotate, p);
+		maxX = max<double>(maxX, s->points[i].x);
+		minX = min<double>(minX, s->points[i].x);
+		maxY = max<double>(maxY, s->points[i].y);
+		minY = min<double>(minY, s->points[i].y);
+	}
+
+	double offCenterX = (maxX + minX) / -2;
+	double offCenterY = (maxY + minY) / -2;
+
+	for (int i = 0; i < count; ++i) {
+		s->points[i].x += offCenterX;
+		s->points[i].y += offCenterY;
+	}
+
+	updateShapeRange(*s);
+
+	return s;
+}
+
+void freeAsteroidShape(Shape* s) {
+	delete[] s->points;
+	delete s;
+}
+
+inline double drand() {
+	return ((double)rand()) / RAND_MAX;
+}
+
+void placeAsteroid(int lvl) {
+	int count = 5;
+	int base = 10;
+	int range = 2;
+
+	if (3 == lvl) {
+		count = 30;
+		base = 50;
+		range = 10;
+	}
+	else if (2 == lvl) {
+		count = 20;
+		base = 30;
+		range = 6;
+	}
+	
+	Shape* shape = generateAsteroidShape(count, base, range);
+	
+	Asteroid a;
+	a.f.pos.x = drand() * SCREEN_WIDTH;
+	a.f.pos.y = drand() * SCREEN_HEIGHT;
+	a.f.angle = 0;
+	a.f.shape = shape;
+	a.f.vel.x = (0.04 * drand() - 0.02) * (4-lvl);
+	a.f.vel.y = (0.04 * drand() - 0.02) * (4-lvl);
+
+	a.aVel = 0.02 / lvl;
+	a.level = lvl;
+
+	asteroids.push_back(a);
+}
+
+
+
+
 int main(int argc, char* argv[])
 {
+	srand(0);
 	updateShapeRange(playerShape);
 	updateShapeRange(bulletShape);
 
 	player.f.pos.x = 400;
 	player.f.pos.y = 300;
 	player.f.shape = &playerShape;
+
+	placeAsteroid(3);
+	placeAsteroid(2);
+	placeAsteroid(1);
 
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		cout << "Error initializing SDL: " << SDL_GetError() << endl;
