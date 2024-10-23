@@ -95,6 +95,14 @@ void scaleDoublePoint(DoublePoint& p, double s) {
 	p.y *= s;
 }
 
+DoublePoint addDoublePoints(DoublePoint& a, DoublePoint& b) {
+	DoublePoint r;
+	r.x = a.x + b.x;
+	r.y = a.y + b.y;
+
+	return r;
+}
+
 void applyMove(FloatingObject& f) {
 	f.pos.x += f.vel.x;
 	f.pos.y += f.vel.y;
@@ -112,8 +120,9 @@ void applyMove(FloatingObject& f) {
 	else if (f.pos.y > SCREEN_HEIGHT) {
 		f.pos.y -= SCREEN_HEIGHT;
 	}
-
 }
+
+FloatingObject nextVectors[3] = {};
 
 DoublePoint calcScreenOffsets(FloatingObject& f) {
 	double xOffset = 0;
@@ -246,17 +255,20 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 		if (bulletHit) {
 			bPtr = bullets.erase(bPtr);
 			
+			Asteroid old = *aPtr;
 			freeAsteroidShape(aPtr->f.shape);
-			if (aPtr->level > 1) {
-				Asteroid replacement = makeAsteroid(aPtr->level - 1);
-				replacement.f.pos = aPtr->f.pos;
-				replacement.f.vel = aPtr->f.vel;
+			asteroids.erase(aPtr);
 
-				*aPtr = replacement;
+			if (old.level > 1) {
+				for (int i = 0; i < 3; i++) {
+					Asteroid next = makeAsteroid(old.level - 1);
+					next.f.pos = addDoublePoints(old.f.pos, nextVectors[i].pos);
+					next.f.vel = addDoublePoints(old.f.vel, nextVectors[i].vel);
+					asteroids.push_back(next);
+				}
 			}
-			else {
-				asteroids.erase(aPtr);
-			}
+			
+			
 		}
 		else {
 			++bPtr;
@@ -475,19 +487,19 @@ inline double drand() {
 }
 
 Asteroid makeAsteroid(int lvl) {
-	int count = 5;
-	int base = 10;
-	int range = 2;
+	int count = 7;
+	int base = 5;
+	int range = 5;
 
 	if (3 == lvl) {
 		count = 30;
-		base = 50;
-		range = 10;
+		base = 30;
+		range = 25;
 	}
 	else if (2 == lvl) {
 		count = 20;
-		base = 30;
-		range = 6;
+		base = 10;
+		range = 15;
 	}
 
 	Shape* shape = generateAsteroidShape(count, base, range);
@@ -510,11 +522,23 @@ void placeAsteroid(int lvl) {
 	asteroids.push_back(makeAsteroid(lvl));
 }
 
+void initNextVectors() {
+	nextVectors[0].pos = { -10,-10 }; 
+	nextVectors[0].vel = { -0.4,-0.4 };
+
+	nextVectors[1].pos = { 10,-10 };
+	nextVectors[1].vel = { 0.4, -0.4 };
+
+	nextVectors[2].pos = { 0, 15 };
+	nextVectors[2].vel = { 0, 0.4 };
+}
+
 int main(int argc, char* argv[])
 {
 	srand(0);
 	updateShapeRange(playerShape);
 	updateShapeRange(bulletShape);
+	initNextVectors();
 
 	player.f.pos.x = 400;
 	player.f.pos.y = 300;
