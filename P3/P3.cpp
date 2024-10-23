@@ -112,6 +112,73 @@ void applyMove(FloatingObject& f) {
 
 }
 
+DoublePoint calcScreenOffsets(FloatingObject& f) {
+	double xOffset = 0;
+	double yOffset = 0;
+
+	if (f.pos.x < f.shape->range) xOffset = SCREEN_WIDTH;
+	else if (f.pos.x > SCREEN_WIDTH - f.shape->range) xOffset = -SCREEN_WIDTH;
+
+	if (f.pos.y < f.shape->range) yOffset = SCREEN_HEIGHT;
+	else if (f.pos.y > SCREEN_HEIGHT - f.shape->range) yOffset = -SCREEN_HEIGHT;
+
+	DoublePoint p;
+	p.x = xOffset;
+	p.y = yOffset;
+
+	return p;
+}
+
+bool floatingObjectsCollides(FloatingObject &a, FloatingObject &b) {
+	DoublePoint p;
+	p.x = a.pos.x - b.pos.x;
+	p.y = a.pos.y - b.pos.y;
+
+	double len = vectorLength(p);
+
+	return len < a.shape->range || len < b.shape->range;
+}
+
+bool bulletCollides(Bullet& bullet, Asteroid& asteroid) {
+	if (floatingObjectsCollides(bullet.f, asteroid.f)) {
+		return true;
+	}
+
+	FloatingObject movedAsteroid;
+
+	DoublePoint asteroidOffset = calcScreenOffsets(asteroid.f);
+	if (asteroidOffset.x != 0) {
+		movedAsteroid = asteroid.f;
+		movedAsteroid.pos.x += asteroidOffset.x;
+
+		if (floatingObjectsCollides(bullet.f, movedAsteroid)) {
+			return true;
+		}
+	}
+
+	if (asteroidOffset.y != 0) {
+		movedAsteroid = asteroid.f;
+		movedAsteroid.pos.y += asteroidOffset.y;
+
+		if (floatingObjectsCollides(bullet.f, movedAsteroid)) {
+			return true;
+		}
+	}
+
+	if (asteroidOffset.x != 0 && asteroidOffset.y != 0) {
+		movedAsteroid = asteroid.f;
+		movedAsteroid.pos.x += asteroidOffset.x;
+		movedAsteroid.pos.y += asteroidOffset.y;
+
+		if (floatingObjectsCollides(bullet.f, movedAsteroid)) {
+			return true;
+		}
+	}
+	
+	return false;
+	
+}
+
 Uint32 tickFrame(Uint32 interval, void* param) {
 	++worldFrame;
 	if (worldFrame % 30 == 0) {
@@ -152,6 +219,23 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 
 	bullets.erase(bullets.begin(), lastToDrop);
 
+	auto bPtr = bullets.begin();
+	for (;bPtr<bullets.end();) {
+		bool callErase = false;
+		for (auto aPtr = asteroids.begin(); aPtr < asteroids.end(); ++aPtr) {
+			if (bulletCollides(*bPtr, *aPtr)) {
+				callErase = true;
+				break;
+			}
+		}
+
+		if (callErase) {
+			bPtr = bullets.erase(bPtr);
+		}
+		else {
+			++bPtr;
+		}
+	}
 
 	SDL_PushEvent( &e);
 	return interval;
@@ -255,25 +339,18 @@ void renderShapeOfFloatingObject(FloatingObject& f) {
 
 	renderShape(base, *f.shape);
 
-	double xOffset = 0;
-	double yOffset = 0;
+	auto offset = calcScreenOffsets(f);
 
-	if (f.pos.x < f.shape->range) xOffset = SCREEN_WIDTH;
-	else if (f.pos.x > SCREEN_WIDTH - f.shape->range) xOffset = -SCREEN_WIDTH;
-
-	if (f.pos.y < f.shape->range) yOffset = SCREEN_HEIGHT;
-	else if (f.pos.y > SCREEN_HEIGHT - f.shape->range) yOffset = -SCREEN_HEIGHT;
-
-	if (xOffset != 0) {
-		renderShapeWithOffset(*f.shape, base, xOffset, 0);
+	if (offset.x != 0) {
+		renderShapeWithOffset(*f.shape, base, offset.x, 0);
 	}
 
-	if (yOffset != 0) {
-		renderShapeWithOffset(*f.shape, base, 0, yOffset);
+	if (offset.y!= 0) {
+		renderShapeWithOffset(*f.shape, base, 0, offset.y);
 	}
 
-	if (xOffset != 0 && yOffset != 0) {
-		renderShapeWithOffset(*f.shape, base, xOffset, yOffset);
+	if (offset.x!= 0 && offset.y!= 0) {
+		renderShapeWithOffset(*f.shape, base, offset.x, offset.y);
 	}
 
 }
@@ -402,9 +479,6 @@ void placeAsteroid(int lvl) {
 
 	asteroids.push_back(a);
 }
-
-
-
 
 int main(int argc, char* argv[])
 {
