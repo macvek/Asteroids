@@ -36,6 +36,9 @@ struct Asteroid {
 	double aVel;
 };
 
+Asteroid makeAsteroid(int lvl);
+void freeAsteroidShape(Shape* s);
+
 vector<Bullet> bullets;
 vector<Asteroid> asteroids;
 
@@ -231,16 +234,29 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 
 	auto bPtr = bullets.begin();
 	for (;bPtr<bullets.end();) {
-		bool callErase = false;
-		for (auto aPtr = asteroids.begin(); aPtr < asteroids.end(); ++aPtr) {
+		bool bulletHit = false;
+		auto aPtr = asteroids.begin();
+		for (; aPtr < asteroids.end(); ++aPtr) {
 			if (bulletCollides(*bPtr, *aPtr)) {
-				callErase = true;
+				bulletHit = true;
 				break;
 			}
 		}
 
-		if (callErase) {
+		if (bulletHit) {
 			bPtr = bullets.erase(bPtr);
+			
+			freeAsteroidShape(aPtr->f.shape);
+			if (aPtr->level > 1) {
+				Asteroid replacement = makeAsteroid(aPtr->level - 1);
+				replacement.f.pos = aPtr->f.pos;
+				replacement.f.vel = aPtr->f.vel;
+
+				*aPtr = replacement;
+			}
+			else {
+				asteroids.erase(aPtr);
+			}
 		}
 		else {
 			++bPtr;
@@ -458,7 +474,7 @@ inline double drand() {
 	return ((double)rand()) / RAND_MAX;
 }
 
-void placeAsteroid(int lvl) {
+Asteroid makeAsteroid(int lvl) {
 	int count = 5;
 	int base = 10;
 	int range = 2;
@@ -473,21 +489,25 @@ void placeAsteroid(int lvl) {
 		base = 30;
 		range = 6;
 	}
-	
+
 	Shape* shape = generateAsteroidShape(count, base, range);
-	
+
 	Asteroid a;
 	a.f.pos.x = drand() * SCREEN_WIDTH;
 	a.f.pos.y = drand() * SCREEN_HEIGHT;
 	a.f.angle = 0;
 	a.f.shape = shape;
-	a.f.vel.x = (0.04 * drand() - 0.02) * (4-lvl);
-	a.f.vel.y = (0.04 * drand() - 0.02) * (4-lvl);
+	a.f.vel.x = (0.04 * drand() - 0.02) * (4 - lvl);
+	a.f.vel.y = (0.04 * drand() - 0.02) * (4 - lvl);
 
 	a.aVel = 0.02 / lvl;
 	a.level = lvl;
 
-	asteroids.push_back(a);
+	return a;
+}
+
+void placeAsteroid(int lvl) {
+	asteroids.push_back(makeAsteroid(lvl));
 }
 
 int main(int argc, char* argv[])
