@@ -200,10 +200,12 @@ bool bulletCollides(Bullet& bullet, Asteroid& asteroid) {
 	return floatingObjectWithOffsetCollides(bullet.f, asteroid.f);
 }
 
-void calculateAsteroidCollision(Asteroid& a, Asteroid& b) {
-	if (floatingObjectWithOffsetCollides(a.f, b.f)) {
-		scaleDoublePoint(a.f.vel, -1);
-		scaleDoublePoint(b.f.vel, -1);
+void calculateBounceCollision(FloatingObject& a, FloatingObject& b) {
+	if (floatingObjectWithOffsetCollides(a, b)) {
+		// exchange velocities;
+		DoublePoint v = a.vel;
+		a.vel = b.vel;
+		b.vel = v;
 	}
 }
 
@@ -273,8 +275,6 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 					asteroids.push_back(next);
 				}
 			}
-			
-			
 		}
 		else {
 			++bPtr;
@@ -282,8 +282,9 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 	}
 
 	for (auto aPtr = asteroids.begin(); aPtr < asteroids.end(); ++aPtr) {
+		calculateBounceCollision(aPtr->f, player.f);
 		for (auto bPtr = aPtr+1; bPtr < asteroids.end(); ++bPtr) {
-			calculateAsteroidCollision(*aPtr, *bPtr);
+			calculateBounceCollision(aPtr->f, bPtr->f);
 		}
 	}
 
@@ -535,8 +536,8 @@ void placeAsteroid(int lvl) {
 }
 
 void initNextVectors() {
-	nextVectors[0].pos = { -10,-10 }; 
-	nextVectors[0].vel = { -0.4,-0.4 };
+	nextVectors[0].pos = { -20,-10 }; 
+	nextVectors[0].vel = { -0.8,-0.4 };
 
 	nextVectors[1].pos = { 10,-10 };
 	nextVectors[1].vel = { 0.4, -0.4 };
@@ -556,6 +557,8 @@ int main(int argc, char* argv[])
 	player.f.pos.y = 300;
 	player.f.shape = &playerShape;
 
+	placeAsteroid(3);
+	placeAsteroid(3);
 	placeAsteroid(3);
 	placeAsteroid(2);
 	placeAsteroid(1);
