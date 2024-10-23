@@ -198,7 +198,13 @@ bool floatingObjectWithOffsetCollides(FloatingObject& a, FloatingObject& b) {
 
 bool bulletCollides(Bullet& bullet, Asteroid& asteroid) {
 	return floatingObjectWithOffsetCollides(bullet.f, asteroid.f);
-	
+}
+
+void calculateAsteroidCollision(Asteroid& a, Asteroid& b) {
+	if (floatingObjectWithOffsetCollides(a.f, b.f)) {
+		scaleDoublePoint(a.f.vel, -1);
+		scaleDoublePoint(b.f.vel, -1);
+	}
 }
 
 Uint32 tickFrame(Uint32 interval, void* param) {
@@ -272,6 +278,12 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 		}
 		else {
 			++bPtr;
+		}
+	}
+
+	for (auto aPtr = asteroids.begin(); aPtr < asteroids.end(); ++aPtr) {
+		for (auto bPtr = aPtr+1; bPtr < asteroids.end(); ++bPtr) {
+			calculateAsteroidCollision(*aPtr, *bPtr);
 		}
 	}
 
@@ -420,7 +432,7 @@ void renderFrame() {
 
 void triggerFire() {
 	Bullet b;
-	b.lifetime = 50;
+	b.lifetime = 100;
 	b.f = player.f;
 	b.f.shape = &bulletShape;
 
