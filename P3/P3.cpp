@@ -139,43 +139,53 @@ bool floatingObjectsCollides(FloatingObject &a, FloatingObject &b) {
 	return len < a.shape->range || len < b.shape->range;
 }
 
-bool bulletCollides(Bullet& bullet, Asteroid& asteroid) {
-	if (floatingObjectsCollides(bullet.f, asteroid.f)) {
-		return true;
+void fillWithOffsetObjects(vector<FloatingObject> &out, FloatingObject& a) {
+	out.push_back(a);
+	DoublePoint offset = calcScreenOffsets(a);
+	FloatingObject variant;
+	if (offset.x != 0) {
+		variant = a;
+		variant.pos.x += offset.x;
+
+		out.push_back(variant);
 	}
 
-	FloatingObject movedAsteroid;
+	if (offset.y != 0) {
+		variant = a;
+		variant.pos.y += offset.y;
 
-	DoublePoint asteroidOffset = calcScreenOffsets(asteroid.f);
-	if (asteroidOffset.x != 0) {
-		movedAsteroid = asteroid.f;
-		movedAsteroid.pos.x += asteroidOffset.x;
-
-		if (floatingObjectsCollides(bullet.f, movedAsteroid)) {
-			return true;
-		}
+		out.push_back(variant);
 	}
 
-	if (asteroidOffset.y != 0) {
-		movedAsteroid = asteroid.f;
-		movedAsteroid.pos.y += asteroidOffset.y;
+	if (offset.x != 0 && offset.y != 0) {
+		variant = a;
+		variant.pos.x += offset.x;
+		variant.pos.y += offset.y;
 
-		if (floatingObjectsCollides(bullet.f, movedAsteroid)) {
-			return true;
-		}
+		out.push_back(variant);
 	}
+}
 
-	if (asteroidOffset.x != 0 && asteroidOffset.y != 0) {
-		movedAsteroid = asteroid.f;
-		movedAsteroid.pos.x += asteroidOffset.x;
-		movedAsteroid.pos.y += asteroidOffset.y;
-
-		if (floatingObjectsCollides(bullet.f, movedAsteroid)) {
-			return true;
-		}
-	}
+bool floatingObjectWithOffsetCollides(FloatingObject& a, FloatingObject& b) {
+	vector<FloatingObject> aVariants;
+	vector<FloatingObject> bVariants;
 	
+	fillWithOffsetObjects(aVariants, a);
+	fillWithOffsetObjects(bVariants, b);
+
+	for (auto aPtr = aVariants.begin(); aPtr < aVariants.end(); ++aPtr) {
+		for (auto bPtr = bVariants.begin(); bPtr < bVariants.end(); ++bPtr) {
+			if (floatingObjectsCollides(*aPtr, *bPtr)) {
+				return true;
+			}
+		}
+	}
+
 	return false;
+}
+
+bool bulletCollides(Bullet& bullet, Asteroid& asteroid) {
+	return floatingObjectWithOffsetCollides(bullet.f, asteroid.f);
 	
 }
 
