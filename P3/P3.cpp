@@ -20,6 +20,7 @@ struct Shape {
 
 struct FloatingObject {
 	double angle;
+	double mass;
 	DoublePoint pos;
 	DoublePoint vel;
 	Shape* shape;
@@ -407,14 +408,14 @@ void renderShapeOfFloatingObject(FloatingObject& f) {
 }
 
 void renderFrame() {
-	if (SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE)) {
+	if (SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE)) {
 		cout << "SDL_SetRenderDrawColor: " << SDL_GetError() << endl;
 	}
 
 	if (SDL_RenderClear(renderer)) {
 		cout << "SDL_RenderClear: " << SDL_GetError() << endl;
 	}
-	SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
 
 	renderShapeOfFloatingObject(player.f);
 
@@ -436,6 +437,7 @@ void triggerFire() {
 	b.lifetime = 100;
 	b.f = player.f;
 	b.f.shape = &bulletShape;
+	b.f.mass = 0;
 
 	auto velVector = directionVector;
 	scaleDoublePoint(velVector, bulletScale);
@@ -524,6 +526,7 @@ Asteroid makeAsteroid(int lvl) {
 	a.f.shape = shape;
 	a.f.vel.x = (0.04 * drand() - 0.02) * (4 - lvl);
 	a.f.vel.y = (0.04 * drand() - 0.02) * (4 - lvl);
+	a.f.mass = lvl * 10;
 
 	a.aVel = 0.02 / lvl;
 	a.level = lvl;
@@ -546,6 +549,13 @@ void initNextVectors() {
 	nextVectors[2].vel = { 0, 0.4 };
 }
 
+void initPlayer() {
+	player.f.pos.x = 400;
+	player.f.pos.y = 300;
+	player.f.shape = &playerShape;
+	player.f.mass = 1;
+}
+
 int main(int argc, char* argv[])
 {
 	srand(0);
@@ -553,9 +563,7 @@ int main(int argc, char* argv[])
 	updateShapeRange(bulletShape);
 	initNextVectors();
 
-	player.f.pos.x = 400;
-	player.f.pos.y = 300;
-	player.f.shape = &playerShape;
+	initPlayer();
 
 	placeAsteroid(3);
 	placeAsteroid(3);
