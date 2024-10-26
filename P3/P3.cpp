@@ -793,7 +793,7 @@ int main(int argc, char* argv[])
 	}
 
 	int registeredTimer = SDL_AddTimer(15, tickFrame, nullptr);
-	window = SDL_CreateWindow("Example", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (int)SCREEN_WIDTH, (int)SCREEN_HEIGHT, 0);
+	window = SDL_CreateWindow("Asteroids", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (int)SCREEN_WIDTH, (int)SCREEN_HEIGHT, 0);
 
 	if (nullptr == window) {
 		cout << "Error creating window: " << SDL_GetError() << endl;
