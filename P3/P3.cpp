@@ -28,11 +28,10 @@ struct Bullet {
 	int lifetime;
 };
 
-struct Sprite {
+struct Anim {
 	FloatingObject f;
-	int shapeIdx;
-	
-	int lifetime;
+	int firstFrame;
+	std::vector<Shape> frames;
 };
 
 struct Asteroid {
@@ -46,7 +45,9 @@ void freeAsteroidShape(Shape* s);
 
 vector<Bullet> bullets;
 vector<Asteroid> asteroids;
-vector<Sprite> sprites;
+vector<Anim> anims;
+bool accelerates;
+Anim flame;
 
 Uint32 globalCustomEventId = 0;
 
@@ -224,14 +225,18 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 	SDL_Event e = {};
 	e.type = globalCustomEventId;
 
-	if (pressedButtons[Accelerate]) {
+	accelerates = pressedButtons[Accelerate];
+	if (accelerates) {
 		auto velVector = directionVector;
 		scaleDoublePoint(velVector, accScale);
 		player.f.vel.x += velVector.x;
 		player.f.vel.y += velVector.y;
+		
 	}
 
 	applyMove(player.f);
+	flame.f.pos = player.f.pos;
+	flame.f.angle = player.f.angle;
 
 	for (auto ptr = bullets.begin(); ptr < bullets.end(); ++ptr) {
 		if (ptr->lifetime > 0) {
@@ -401,6 +406,14 @@ void renderShapeOfFloatingObject(FloatingObject& f) {
 
 }
 
+const int animFrameLength = 5;
+void renderAnim(Anim &anim) {
+	int animFrame = ((worldFrame - anim.firstFrame) / animFrameLength) % anim.frames.size();
+	anim.f.shape = &anim.frames[animFrame];
+	renderShapeOfFloatingObject(anim.f);
+}
+
+
 void renderFrame() {
 	if (SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE)) {
 		cout << "SDL_SetRenderDrawColor: " << SDL_GetError() << endl;
@@ -421,6 +434,14 @@ void renderFrame() {
 
 	for (auto ptr = asteroids.begin(); ptr < asteroids.end(); ++ptr) {
 		renderShapeOfFloatingObject(ptr->f);
+	}
+
+	for (auto ptr = anims.begin(); ptr < anims.end(); ++ptr) {
+		renderAnim(*ptr);
+	}
+
+	if (accelerates) {
+		renderAnim(flame);
 	}
 
 	SDL_RenderPresent(renderer);
@@ -559,6 +580,14 @@ int main(int argc, char* argv[])
 	placeAsteroid(3);
 	placeAsteroid(2);
 	placeAsteroid(1);
+
+	
+	flame.firstFrame = worldFrame;
+
+	flame.frames.push_back({ {{ -12,-7}, {-12,7}, {-25,0} } });
+	flame.frames.push_back({ {{ -12,-6}, {-12,6}, {-24,0} }});
+	flame.frames.push_back({ {{ -12,-5}, {-12,5}, {-23,0} } });
+	
 
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		cout << "Error initializing SDL: " << SDL_GetError() << endl;
