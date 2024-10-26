@@ -746,10 +746,10 @@ void initSounds() {
 		cout << "Mix_OpenAudio: " << SDL_GetError() << endl;
 	}
 	
-	shotWav = loadSound("C:/samples/shot.wav");
-	boosterWav = loadSound("C:/samples/booster.wav");
-	explodeWav = loadSound("C:/samples/explode.wav");
-	crackWav = loadSound("C:/samples/crack.wav");
+	shotWav = loadSound("shot.wav");
+	boosterWav = loadSound("booster.wav");
+	explodeWav = loadSound("explode.wav");
+	crackWav = loadSound("crack.wav");
 	
 	Mix_QuerySpec(&audio_rate, &audio_format, &audio_channels);
 	audio_channels = Mix_AllocateChannels(MIX_CHANNELS);
