@@ -7,6 +7,8 @@
 
 using namespace std;
 
+bool runNewGame = false;
+
 struct DoublePoint {
 	double x, y;
 };
@@ -32,6 +34,7 @@ struct Anim {
 	FloatingObject f;
 	int firstFrame;
 	std::vector<Shape> frames;
+	bool loop;
 };
 
 struct Asteroid {
@@ -46,9 +49,10 @@ void freeAsteroidShape(Shape* s);
 vector<Bullet> bullets;
 vector<Asteroid> asteroids;
 bool accelerates;
-bool explode;
 Anim flame;
 Anim explosion;
+
+bool playerAlive = true;
 
 Uint32 globalCustomEventId = 0;
 
@@ -56,13 +60,18 @@ double SCREEN_WIDTH = 800;
 double SCREEN_HEIGHT = 600;
 
 int worldFrame = 0;
+int nextFireFrame = -1;
 
 DoublePoint directionVector;
 double accScale = 0.05;
 double bulletScale = 10;
 
+void newGame();
+void triggerFire();
+
 typedef enum {
 	Kill,
+	Fire,
 	Accelerate,
 	ActionButtonCount
 
@@ -214,22 +223,38 @@ void calculateBounceCollision(FloatingObject& a, FloatingObject& b) {
 	}
 }
 
+
+
 Uint32 tickFrame(Uint32 interval, void* param) {
+	if (runNewGame) {
+		newGame();
+		runNewGame = false;
+	}
+
 	++worldFrame;
 	if (worldFrame % 30 == 0) {
 		cout << "FRAME: " << worldFrame << endl;
 	}
-	
+
 	SDL_Event e = {};
 	e.type = globalCustomEventId;
 
-	explode = pressedButtons[Kill];
+	if (pressedButtons[Kill]) {
+		playerAlive = false;
+		explosion.firstFrame = worldFrame;
+	}
+
 	accelerates = pressedButtons[Accelerate];
-	if (accelerates && !explode) {
+	if (accelerates && playerAlive) {
 		auto velVector = directionVector;
 		scaleDoublePoint(velVector, accScale);
 		player.f.vel.x += velVector.x;
 		player.f.vel.y += velVector.y;
+	}
+
+	if (pressedButtons[Fire] && playerAlive && worldFrame > nextFireFrame) {
+		nextFireFrame = worldFrame + 10;
+		triggerFire();
 	}
 
 	applyMove(player.f);
@@ -407,9 +432,15 @@ void renderShapeOfFloatingObject(FloatingObject& f) {
 
 const int animFrameLength = 5;
 void renderAnim(Anim &anim) {
-	int animFrame = ((worldFrame - anim.firstFrame) / animFrameLength) % anim.frames.size();
-	anim.f.shape = &anim.frames[animFrame];
-	renderShapeOfFloatingObject(anim.f);
+	int animFrame = (worldFrame - anim.firstFrame) / animFrameLength;
+	if (anim.loop) {
+		animFrame = animFrame % anim.frames.size();
+	}
+
+	if (animFrame < anim.frames.size()) {
+		anim.f.shape = &anim.frames[animFrame];
+		renderShapeOfFloatingObject(anim.f);
+	}
 }
 
 
@@ -423,15 +454,11 @@ void renderFrame() {
 	}
 	SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
 
-	if (explode) {
+	if (!playerAlive) {
 		renderAnim(explosion);
 	}
 	else {
 		renderShapeOfFloatingObject(player.f);
-	}
-
-	if (accelerates) {
-		renderAnim(flame);
 	}
 
 	for (auto ptr = bullets.begin(); ptr < bullets.end(); ++ptr) {
@@ -564,8 +591,6 @@ void initNextVectors() {
 }
 
 void initPlayer() {
-	player.f.pos.x = 400;
-	player.f.pos.y = 300;
 	player.f.shape = &playerShape;
 	
 }
@@ -584,7 +609,7 @@ void initFlame() {
 void initExplosion() {
 	explosion.f.angle = 0;
 	explosion.firstFrame = worldFrame;
-
+	explosion.loop = false;
 
 	for (int i = 0; i < 15; ++i) {
 		Shape* shape = generateAsteroidShape(20, 5 + ((i % 5)*10), 20);
@@ -592,6 +617,28 @@ void initExplosion() {
 		freeAsteroidShape(shape);
 	}
 	
+}
+
+void newGame() {
+	worldFrame = 0;
+	nextFireFrame = -1;
+	playerAlive = true;
+	player.f.pos = { 400, 300 };
+	player.f.vel = { 0, 0 };
+	player.f.angle = 0;
+
+	for (auto ptr = asteroids.begin(); ptr < asteroids.end(); ++ptr) {
+		freeAsteroidShape(ptr->f.shape);
+	}
+
+	asteroids.clear();
+	bullets.clear();
+
+	placeAsteroid(3);
+	placeAsteroid(3);
+	placeAsteroid(3);
+	placeAsteroid(2);
+	placeAsteroid(1);
 }
 
 int main(int argc, char* argv[])
@@ -603,14 +650,10 @@ int main(int argc, char* argv[])
 
 	initPlayer();
 
-	placeAsteroid(3);
-	placeAsteroid(3);
-	placeAsteroid(3);
-	placeAsteroid(2);
-	placeAsteroid(1);
-
 	initFlame();
 	initExplosion();
+
+	runNewGame = true;
 
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		cout << "Error initializing SDL: " << SDL_GetError() << endl;
@@ -665,8 +708,8 @@ int main(int argc, char* argv[])
 		if (SDL_WaitEvent(&e)) {
 			if (e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
 				SDL_MouseButtonEvent* mouseButtonEvent= (SDL_MouseButtonEvent*)(&e);
-				if (1 == mouseButtonEvent->button && e.type == SDL_MOUSEBUTTONDOWN) {
-					triggerFire();
+				if (1 == mouseButtonEvent->button) {
+					pressedButtons[Fire] = e.type == SDL_MOUSEBUTTONDOWN;
 				}
 
 				if (3 == mouseButtonEvent->button) {
@@ -676,7 +719,6 @@ int main(int argc, char* argv[])
 
 			else if (e.type == SDL_MOUSEMOTION) {
 				SDL_MouseMotionEvent* mouseMotionEvent = (SDL_MouseMotionEvent*)(&e);
-				cout << "Mx: " << mouseMotionEvent->x << " My: " << mouseMotionEvent->y << " dMx: " << mouseMotionEvent->xrel << " dMy: " << " dMx: " <<  mouseMotionEvent->yrel << endl;
 
 				directionVector = identityPointingTo(mouseMotionEvent->x, mouseMotionEvent->y);
 				player.f.angle = angleOfPoint(directionVector);
@@ -690,7 +732,9 @@ int main(int argc, char* argv[])
 				else if (key == SDL_SCANCODE_RETURN) {
 					pressedButtons[Kill] = e.type == SDL_KEYDOWN;
 				}
-				
+				else if (key == SDL_SCANCODE_SPACE) {
+					runNewGame = true;
+				}
 				
 				if (false ) {
 					cout << "Return key pressed" << endl;
