@@ -45,9 +45,10 @@ void freeAsteroidShape(Shape* s);
 
 vector<Bullet> bullets;
 vector<Asteroid> asteroids;
-vector<Anim> anims;
 bool accelerates;
+bool explode;
 Anim flame;
+Anim explosion;
 
 Uint32 globalCustomEventId = 0;
 
@@ -61,10 +62,7 @@ double accScale = 0.05;
 double bulletScale = 10;
 
 typedef enum {
-	MoveLeft = 0,
-	MoveRight,
-	MoveUp,
-	MoveDown,
+	Kill,
 	Accelerate,
 	ActionButtonCount
 
@@ -225,18 +223,19 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 	SDL_Event e = {};
 	e.type = globalCustomEventId;
 
+	explode = pressedButtons[Kill];
 	accelerates = pressedButtons[Accelerate];
-	if (accelerates) {
+	if (accelerates && !explode) {
 		auto velVector = directionVector;
 		scaleDoublePoint(velVector, accScale);
 		player.f.vel.x += velVector.x;
 		player.f.vel.y += velVector.y;
-		
 	}
 
 	applyMove(player.f);
 	flame.f.pos = player.f.pos;
 	flame.f.angle = player.f.angle;
+	explosion.f.pos = player.f.pos;
 
 	for (auto ptr = bullets.begin(); ptr < bullets.end(); ++ptr) {
 		if (ptr->lifetime > 0) {
@@ -424,7 +423,16 @@ void renderFrame() {
 	}
 	SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
 
-	renderShapeOfFloatingObject(player.f);
+	if (explode) {
+		renderAnim(explosion);
+	}
+	else {
+		renderShapeOfFloatingObject(player.f);
+	}
+
+	if (accelerates) {
+		renderAnim(flame);
+	}
 
 	for (auto ptr = bullets.begin(); ptr < bullets.end(); ++ptr) {
 		if (ptr->lifetime > 0) {
@@ -434,10 +442,6 @@ void renderFrame() {
 
 	for (auto ptr = asteroids.begin(); ptr < asteroids.end(); ++ptr) {
 		renderShapeOfFloatingObject(ptr->f);
-	}
-
-	for (auto ptr = anims.begin(); ptr < anims.end(); ++ptr) {
-		renderAnim(*ptr);
 	}
 
 	if (accelerates) {
@@ -566,6 +570,30 @@ void initPlayer() {
 	
 }
 
+void initFlame() {
+	flame.firstFrame = worldFrame;
+
+	flame.frames.push_back({ {{ -12,-7}, {-12,7}, {-25,0} } });
+	flame.frames.push_back({ {{ -12,-6}, {-12,6}, {-24,0} } });
+	flame.frames.push_back({ {{ -12,-5}, {-12,5}, {-23,0} } });
+	updateShapeRange(flame.frames[0]);
+	updateShapeRange(flame.frames[1]);
+	updateShapeRange(flame.frames[2]);
+}
+
+void initExplosion() {
+	explosion.f.angle = 0;
+	explosion.firstFrame = worldFrame;
+
+
+	for (int i = 0; i < 15; ++i) {
+		Shape* shape = generateAsteroidShape(20, 5 + ((i % 5)*10), 20);
+		explosion.frames.push_back(*shape);
+		freeAsteroidShape(shape);
+	}
+	
+}
+
 int main(int argc, char* argv[])
 {
 	srand(0);
@@ -581,13 +609,8 @@ int main(int argc, char* argv[])
 	placeAsteroid(2);
 	placeAsteroid(1);
 
-	
-	flame.firstFrame = worldFrame;
-
-	flame.frames.push_back({ {{ -12,-7}, {-12,7}, {-25,0} } });
-	flame.frames.push_back({ {{ -12,-6}, {-12,6}, {-24,0} }});
-	flame.frames.push_back({ {{ -12,-5}, {-12,5}, {-23,0} } });
-	
+	initFlame();
+	initExplosion();
 
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
 		cout << "Error initializing SDL: " << SDL_GetError() << endl;
@@ -664,8 +687,12 @@ int main(int argc, char* argv[])
 				if (key == SDL_SCANCODE_ESCAPE) {
 					break;
 				}
-
-				if (key == SDL_SCANCODE_RETURN && e.type == SDL_KEYDOWN) {
+				else if (key == SDL_SCANCODE_RETURN) {
+					pressedButtons[Kill] = e.type == SDL_KEYDOWN;
+				}
+				
+				
+				if (false ) {
 					cout << "Return key pressed" << endl;
 
 					if (!musicStarted) {
@@ -683,18 +710,7 @@ int main(int argc, char* argv[])
 						paused = !paused;
 					}
 				}
-				else if (key == SDL_SCANCODE_LEFT) {
-					pressedButtons[MoveLeft] = e.type == SDL_KEYDOWN;
-				}
-				else if (key == SDL_SCANCODE_RIGHT) {
-					pressedButtons[MoveRight] = e.type == SDL_KEYDOWN;
-				}
-				else if (key == SDL_SCANCODE_UP) {
-					pressedButtons[MoveUp] = e.type == SDL_KEYDOWN;
-				}
-				else if (key == SDL_SCANCODE_DOWN) {
-					pressedButtons[MoveDown] = e.type == SDL_KEYDOWN;
-				}
+				
 			}
 			else if (e.type == SDL_QUIT) {
 				break;
