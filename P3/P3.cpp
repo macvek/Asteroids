@@ -69,6 +69,8 @@ double bulletScale = 10;
 void newGame();
 void triggerFire();
 void placeAsteroid(int lvl);
+void explodeShot();
+
 
 typedef enum {
 	Kill,
@@ -233,6 +235,7 @@ void calculateBounceCollision(FloatingObject& a, FloatingObject& b) {
 void killPlayer() {
 	playerAlive = false;
 	explosion.firstFrame = worldFrame;
+	explodeShot();
 }
 
 void calculateKillCollisions(FloatingObject& a, FloatingObject& b) {
@@ -682,11 +685,16 @@ void newGame() {
 	placeAsteroid(1);
 }
 
-Mix_Chunk* shotWav;
-Mix_Chunk* boosterWav;
+Mix_Chunk* shotWav = nullptr;
+Mix_Chunk* boosterWav = nullptr;
+Mix_Chunk* explodeWav = nullptr;
 
 void soundShot() {
 	Mix_PlayChannel((currentAudio++) % (audio_channels-1), shotWav, 0);
+}
+
+void explodeShot() {
+	Mix_PlayChannel((currentAudio++) % (audio_channels-1), explodeWav, 0);
 }
 
 void initSounds() {
@@ -700,6 +708,11 @@ void initSounds() {
 	}
 
 	boosterWav = Mix_LoadWAV("C:/samples/booster.wav");
+	if (nullptr == boosterWav) {
+		cout << "Mix_LoadWAV: " << SDL_GetError() << endl;
+	}
+
+	explodeWav = Mix_LoadWAV("C:/samples/explode.wav");
 	if (nullptr == boosterWav) {
 		cout << "Mix_LoadWAV: " << SDL_GetError() << endl;
 	}
