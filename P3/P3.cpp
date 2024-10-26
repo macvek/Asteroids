@@ -12,11 +12,9 @@ struct DoublePoint {
 };
 
 struct Shape {
-	DoublePoint *points;
-	int pointsCount;
+	std::vector<DoublePoint> points;
 	double range;
 };
-
 
 struct FloatingObject {
 	double angle;
@@ -27,6 +25,13 @@ struct FloatingObject {
 
 struct Bullet {
 	FloatingObject f;
+	int lifetime;
+};
+
+struct Sprite {
+	FloatingObject f;
+	int shapeIdx;
+	
 	int lifetime;
 };
 
@@ -41,6 +46,7 @@ void freeAsteroidShape(Shape* s);
 
 vector<Bullet> bullets;
 vector<Asteroid> asteroids;
+vector<Sprite> sprites;
 
 Uint32 globalCustomEventId = 0;
 
@@ -347,26 +353,15 @@ void M33_Print(M33& m) {
 	cout << " [ " << m.m[2][0] << "\t" << m.m[2][1] << "\t" << m.m[2][2] << " ] " << endl;
 }
 
-DoublePoint playerShapePoints[] = {
-	{-10,-10}, {10,-2}, {10,2}, {-10,10}
-};
 
-Shape playerShape = {
-	playerShapePoints, 4, 
-};
+Shape playerShape = { { {-10,-10}, {10,-2}, {10,2}, {-10,10} } };
 
-DoublePoint bulletShapePoints[] = {
-	{-4,-2}, {4,-2}, {4,2}, {-4,2}
-};
-
-Shape bulletShape = {
-	bulletShapePoints, 4
-};
+Shape bulletShape = { { {-4,-2}, {4,-2}, {4,2}, {-4,2} } };
 
 void renderShape(M33& toApply, Shape& shape) {
-	for (int i = 0; i < shape.pointsCount; i++) {
+	for (int i = 0; i < shape.points.size(); i++) {
 		DoublePoint from = M33_Apply(toApply, shape.points[i]);
-		DoublePoint to = M33_Apply(toApply, shape.points[(i + 1) % shape.pointsCount]);
+		DoublePoint to = M33_Apply(toApply, shape.points[(i + 1) % shape.points.size()]);
 
 		SDL_RenderDrawLine(renderer, (int)floor(from.x), (int)floor(from.y), (int)floor(to.x), (int)floor(to.y));
 	}
@@ -448,7 +443,7 @@ void triggerFire() {
 
 void updateShapeRange(Shape& s) {
 	double maxdist = 0;
-	for (int i = 0; i < s.pointsCount; i++) {
+	for (int i = 0; i < s.points.size(); i++) {
 		maxdist = max<double>(maxdist, vectorLength(s.points[i]));
 	}
 
@@ -458,8 +453,6 @@ void updateShapeRange(Shape& s) {
 Shape* generateAsteroidShape(int count, int baseSize, int sizeRange) {
 	Shape *s = new Shape;
 	
-	s->pointsCount = count;
-	s->points = new DoublePoint[count];
 	double angle = M_PI / count * 2;
 	M33 rotate; 
 	
@@ -470,7 +463,7 @@ Shape* generateAsteroidShape(int count, int baseSize, int sizeRange) {
 		p.x = baseSize + (rand() % sizeRange);
 		M33_Rotate(rotate, angle*i);
 
-		s->points[i] = M33_Apply(rotate, p);
+		s->points.push_back(M33_Apply(rotate, p));
 		maxX = max<double>(maxX, s->points[i].x);
 		minX = min<double>(minX, s->points[i].x);
 		maxY = max<double>(maxY, s->points[i].y);
@@ -491,7 +484,6 @@ Shape* generateAsteroidShape(int count, int baseSize, int sizeRange) {
 }
 
 void freeAsteroidShape(Shape* s) {
-	delete[] s->points;
 	delete s;
 }
 
