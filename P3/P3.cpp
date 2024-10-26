@@ -459,6 +459,9 @@ void renderFrame() {
 	}
 	else {
 		renderShapeOfFloatingObject(player.f);
+		if (accelerates) {
+			renderAnim(flame);
+		}
 	}
 
 	for (auto ptr = bullets.begin(); ptr < bullets.end(); ++ptr) {
@@ -469,10 +472,6 @@ void renderFrame() {
 
 	for (auto ptr = asteroids.begin(); ptr < asteroids.end(); ++ptr) {
 		renderShapeOfFloatingObject(ptr->f);
-	}
-
-	if (accelerates) {
-		renderAnim(flame);
 	}
 
 	SDL_RenderPresent(renderer);
@@ -604,6 +603,8 @@ void initFlame() {
 	updateShapeRange(flame.frames[0]);
 	updateShapeRange(flame.frames[1]);
 	updateShapeRange(flame.frames[2]);
+
+	flame.loop = true;
 }
 
 void initExplosion() {
