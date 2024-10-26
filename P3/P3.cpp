@@ -68,6 +68,7 @@ double bulletScale = 10;
 
 void newGame();
 void triggerFire();
+void placeAsteroid(int lvl);
 
 typedef enum {
 	Kill,
@@ -242,6 +243,11 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 	}
 
 	++worldFrame;
+
+
+	if (0 == worldFrame % 200) {
+		placeAsteroid(3);
+	}
 
 	SDL_Event e = {};
 	e.type = globalCustomEventId;
@@ -587,6 +593,14 @@ Asteroid makeAsteroid(int lvl) {
 
 void placeAsteroid(int lvl) {
 	asteroids.push_back(makeAsteroid(lvl));
+	
+	Asteroid* justAdded = &asteroids[asteroids.size() - 1];
+	if (floatingObjectWithOffsetCollides(player.f, justAdded->f)) {
+		// abort if player would hit it 
+		freeAsteroidShape(justAdded->f.shape);
+		justAdded = nullptr;
+		asteroids.pop_back();
+	}
 }
 
 void initNextVectors() {
