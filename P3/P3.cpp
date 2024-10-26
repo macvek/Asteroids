@@ -223,6 +223,16 @@ void calculateBounceCollision(FloatingObject& a, FloatingObject& b) {
 	}
 }
 
+void killPlayer() {
+	playerAlive = false;
+	explosion.firstFrame = worldFrame;
+}
+
+void calculateKillCollisions(FloatingObject& a, FloatingObject& b) {
+	if (floatingObjectWithOffsetCollides(a, b)) {
+		killPlayer();
+	}
+}
 
 
 Uint32 tickFrame(Uint32 interval, void* param) {
@@ -232,16 +242,12 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 	}
 
 	++worldFrame;
-	if (worldFrame % 30 == 0) {
-		cout << "FRAME: " << worldFrame << endl;
-	}
 
 	SDL_Event e = {};
 	e.type = globalCustomEventId;
 
 	if (pressedButtons[Kill]) {
-		playerAlive = false;
-		explosion.firstFrame = worldFrame;
+		killPlayer();
 	}
 
 	accelerates = pressedButtons[Accelerate];
@@ -316,8 +322,13 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 		}
 	}
 
+	if (playerAlive) {
+		for (auto aPtr = asteroids.begin(); aPtr < asteroids.end(); ++aPtr) {
+			calculateKillCollisions(aPtr->f, player.f);
+		}
+	}
+
 	for (auto aPtr = asteroids.begin(); aPtr < asteroids.end(); ++aPtr) {
-		calculateBounceCollision(aPtr->f, player.f);
 		for (auto bPtr = aPtr+1; bPtr < asteroids.end(); ++bPtr) {
 			calculateBounceCollision(aPtr->f, bPtr->f);
 		}
@@ -628,6 +639,8 @@ void newGame() {
 	player.f.vel = { 0, 0 };
 	player.f.angle = 0;
 
+	directionVector = { 1,0 };
+
 	for (auto ptr = asteroids.begin(); ptr < asteroids.end(); ++ptr) {
 		freeAsteroidShape(ptr->f.shape);
 	}
@@ -762,9 +775,6 @@ int main(int argc, char* argv[])
 			}
 			else if (e.type == globalCustomEventId) {
 				renderFrame();
-			}
-			else {
-				cout << "Not handled event type: " << e.type << endl;
 			}
 		}
 		else {
