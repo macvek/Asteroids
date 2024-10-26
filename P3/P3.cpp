@@ -20,7 +20,6 @@ struct Shape {
 
 struct FloatingObject {
 	double angle;
-	double mass;
 	DoublePoint pos;
 	DoublePoint vel;
 	Shape* shape;
@@ -437,7 +436,6 @@ void triggerFire() {
 	b.lifetime = 100;
 	b.f = player.f;
 	b.f.shape = &bulletShape;
-	b.f.mass = 0;
 
 	auto velVector = directionVector;
 	scaleDoublePoint(velVector, bulletScale);
@@ -526,7 +524,6 @@ Asteroid makeAsteroid(int lvl) {
 	a.f.shape = shape;
 	a.f.vel.x = (0.04 * drand() - 0.02) * (4 - lvl);
 	a.f.vel.y = (0.04 * drand() - 0.02) * (4 - lvl);
-	a.f.mass = lvl * 10;
 
 	a.aVel = 0.02 / lvl;
 	a.level = lvl;
@@ -553,7 +550,7 @@ void initPlayer() {
 	player.f.pos.x = 400;
 	player.f.pos.y = 300;
 	player.f.shape = &playerShape;
-	player.f.mass = 1;
+	
 }
 
 int main(int argc, char* argv[])
