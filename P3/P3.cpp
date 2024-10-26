@@ -69,7 +69,8 @@ double bulletScale = 10;
 void newGame();
 void triggerFire();
 void placeAsteroid(int lvl);
-void explodeShot();
+void soundExplode();
+void soundCrack();
 
 
 typedef enum {
@@ -85,8 +86,9 @@ bool pressedButtons[ActionButtonCount] = {};
 int currentAudio = 0;
 int audio_rate = MIX_DEFAULT_FREQUENCY;
 Uint16 audio_format = MIX_DEFAULT_FORMAT;
-int audio_channels = MIX_DEFAULT_CHANNELS;
-
+int audio_channels = MIX_CHANNELS;
+int commonChannels = MIX_CHANNELS - 2;
+int boosterChannel = 0;
 
 struct Player {
 	FloatingObject f;
@@ -235,7 +237,7 @@ void calculateBounceCollision(FloatingObject& a, FloatingObject& b) {
 void killPlayer() {
 	playerAlive = false;
 	explosion.firstFrame = worldFrame;
-	explodeShot();
+	soundExplode();
 }
 
 void calculateKillCollisions(FloatingObject& a, FloatingObject& b) {
@@ -271,10 +273,10 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 		scaleDoublePoint(velVector, accScale);
 		player.f.vel.x += velVector.x;
 		player.f.vel.y += velVector.y;
-		Mix_Resume(audio_channels - 1);
+		Mix_Resume(boosterChannel);
 	}
 	else {
-		Mix_Pause(audio_channels - 1);
+		Mix_Pause(boosterChannel);
 	}
 
 	if (pressedButtons[Fire] && playerAlive && worldFrame > nextFireFrame) {
@@ -316,6 +318,7 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 		for (; aPtr < asteroids.end(); ++aPtr) {
 			if (bulletCollides(*bPtr, *aPtr)) {
 				bulletHit = true;
+				soundCrack();
 				break;
 			}
 		}
@@ -688,38 +691,51 @@ void newGame() {
 Mix_Chunk* shotWav = nullptr;
 Mix_Chunk* boosterWav = nullptr;
 Mix_Chunk* explodeWav = nullptr;
+Mix_Chunk* crackWav = nullptr;
 
 void soundShot() {
-	Mix_PlayChannel((currentAudio++) % (audio_channels-1), shotWav, 0);
+	Mix_PlayChannel((currentAudio++) % commonChannels, shotWav, 0);
 }
 
-void explodeShot() {
-	Mix_PlayChannel((currentAudio++) % (audio_channels-1), explodeWav, 0);
+void soundCrack() {
+	Mix_PlayChannel((currentAudio++) % commonChannels, crackWav, 0);
+}
+
+void soundExplode() {
+	Mix_PlayChannel( commonChannels+1, explodeWav, 0);
+}
+
+
+Mix_Chunk* loadSound(const char* path) {
+	auto chunk = Mix_LoadWAV(path);
+	if (nullptr == shotWav) {
+		cout << "Mix_LoadWAV: " << SDL_GetError() << " for path "<<path<< endl;
+	}
+
+	return chunk;
 }
 
 void initSounds() {
 	if (Mix_OpenAudio(audio_rate, audio_format, audio_channels, 4096)) {
 		cout << "Mix_OpenAudio: " << SDL_GetError() << endl;
 	}
-
-	shotWav = Mix_LoadWAV("C:/samples/shot.wav");
-	if (nullptr == shotWav) {
-		cout << "Mix_LoadWAV: " << SDL_GetError() << endl;
-	}
-
-	boosterWav = Mix_LoadWAV("C:/samples/booster.wav");
-	if (nullptr == boosterWav) {
-		cout << "Mix_LoadWAV: " << SDL_GetError() << endl;
-	}
-
-	explodeWav = Mix_LoadWAV("C:/samples/explode.wav");
-	if (nullptr == boosterWav) {
-		cout << "Mix_LoadWAV: " << SDL_GetError() << endl;
-	}
+	
+	shotWav = loadSound("C:/samples/shot.wav");
+	boosterWav = loadSound("C:/samples/booster.wav");
+	explodeWav = loadSound("C:/samples/explode.wav");
+	crackWav = loadSound("C:/samples/crack.wav");
 	
 	Mix_QuerySpec(&audio_rate, &audio_format, &audio_channels);
-	Mix_PlayChannel(audio_channels - 1, boosterWav, -1);
-	Mix_Pause(audio_channels - 1);
+	audio_channels = Mix_AllocateChannels(MIX_CHANNELS);
+	if (audio_channels < 2) {
+		commonChannels = 1;
+	}
+	else {
+		commonChannels = audio_channels - 2;
+		boosterChannel = commonChannels;
+		Mix_PlayChannel(boosterChannel, boosterWav, -1);
+		Mix_Pause(boosterChannel);
+	}
 }
 
 int main(int argc, char* argv[])
