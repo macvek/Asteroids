@@ -80,6 +80,12 @@ typedef enum {
 
 bool pressedButtons[ActionButtonCount] = {};
 
+int currentAudio = 0;
+int audio_rate = MIX_DEFAULT_FREQUENCY;
+Uint16 audio_format = MIX_DEFAULT_FORMAT;
+int audio_channels = MIX_DEFAULT_CHANNELS;
+
+
 struct Player {
 	FloatingObject f;
 } player;
@@ -262,6 +268,10 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 		scaleDoublePoint(velVector, accScale);
 		player.f.vel.x += velVector.x;
 		player.f.vel.y += velVector.y;
+		Mix_Resume(audio_channels - 1);
+	}
+	else {
+		Mix_Pause(audio_channels - 1);
 	}
 
 	if (pressedButtons[Fire] && playerAlive && worldFrame > nextFireFrame) {
@@ -494,6 +504,8 @@ void renderFrame() {
 	SDL_RenderPresent(renderer);
 }
 
+void soundShot();
+
 void triggerFire() {
 	Bullet b;
 	b.lifetime = 100;
@@ -507,6 +519,7 @@ void triggerFire() {
 	b.f.vel.y += velVector.y;
 
 	bullets.push_back(b);
+	soundShot();
 }
 
 void updateShapeRange(Shape& s) {
@@ -669,9 +682,37 @@ void newGame() {
 	placeAsteroid(1);
 }
 
+Mix_Chunk* shotWav;
+Mix_Chunk* boosterWav;
+
+void soundShot() {
+	Mix_PlayChannel((currentAudio++) % (audio_channels-1), shotWav, 0);
+}
+
+void initSounds() {
+	if (Mix_OpenAudio(audio_rate, audio_format, audio_channels, 4096)) {
+		cout << "Mix_OpenAudio: " << SDL_GetError() << endl;
+	}
+
+	shotWav = Mix_LoadWAV("C:/samples/shot.wav");
+	if (nullptr == shotWav) {
+		cout << "Mix_LoadWAV: " << SDL_GetError() << endl;
+	}
+
+	boosterWav = Mix_LoadWAV("C:/samples/booster.wav");
+	if (nullptr == boosterWav) {
+		cout << "Mix_LoadWAV: " << SDL_GetError() << endl;
+	}
+	
+	Mix_QuerySpec(&audio_rate, &audio_format, &audio_channels);
+	Mix_PlayChannel(audio_channels - 1, boosterWav, -1);
+	Mix_Pause(audio_channels - 1);
+}
+
 int main(int argc, char* argv[])
 {
 	srand(0);
+	initSounds();
 	updateShapeRange(playerShape);
 	updateShapeRange(bulletShape);
 	initNextVectors();
@@ -711,26 +752,7 @@ int main(int argc, char* argv[])
 	}
 	
 	renderFrame();
-	int audio_rate = MIX_DEFAULT_FREQUENCY;
-	Uint16 audio_format = MIX_DEFAULT_FORMAT;
-	int audio_channels = MIX_DEFAULT_CHANNELS;
-
-	if (Mix_OpenAudio(audio_rate, audio_format, audio_channels, 4096)) {
-		cout << "Mix_OpenAudio: " << SDL_GetError() << endl;
-	}
 	
-	Mix_Chunk* loadedWav = Mix_LoadWAV("C:/samples/CantinaBand60.wav");
-	if (nullptr == loadedWav) {
-		cout << "Mix_LoadWAV: " << SDL_GetError() << endl;
-	}
-	else {
-		Mix_QuerySpec(&audio_rate, &audio_format, &audio_channels);
-		cout << "Mix_QuerySpec: " << audio_rate <<" "<< audio_format<<" "<< audio_channels << endl;
-	}
-
-	bool musicStarted = false;
-	bool paused = false;
-
 	SDL_Event e;
 	for (;;) {
 		if (SDL_WaitEvent(&e)) {
@@ -757,30 +779,8 @@ int main(int argc, char* argv[])
 				if (key == SDL_SCANCODE_ESCAPE) {
 					break;
 				}
-				else if (key == SDL_SCANCODE_RETURN) {
-					pressedButtons[Kill] = e.type == SDL_KEYDOWN;
-				}
 				else if (key == SDL_SCANCODE_SPACE) {
 					runNewGame = true;
-				}
-				
-				if (false ) {
-					cout << "Return key pressed" << endl;
-
-					if (!musicStarted) {
-						Mix_PlayChannel(0, loadedWav, 0);
-						musicStarted = 1;
-					}
-					else {
-						if (paused) {
-							Mix_Resume(0);
-						}
-						else {
-							Mix_Pause(0);
-						}
-
-						paused = !paused;
-					}
 				}
 				
 			}
