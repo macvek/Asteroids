@@ -72,6 +72,12 @@ void placeAsteroid(int lvl);
 void soundExplode();
 void soundCrack();
 
+struct Stats {
+	int shots;
+	int hits;
+	int fuel;
+} stats;
+
 
 typedef enum {
 	Kill,
@@ -234,10 +240,27 @@ void calculateBounceCollision(FloatingObject& a, FloatingObject& b) {
 	}
 }
 
+void showStats() {
+	double accuracy = floor(100.0 * stats.hits / stats.shots);
+	if (stats.shots == 0) {
+		accuracy = 0;
+	}
+	
+	cout << "You crashed " << endl;
+	cout << "Hits    : " << stats.hits << endl;
+	cout << "Shots   : " << stats.shots << endl;
+	cout << "Accuracy: " << accuracy << endl;
+	cout << "Fuel    : " << stats.fuel<< endl;
+	cout << "------------------" << endl;
+}
+	
+
+
 void killPlayer() {
 	playerAlive = false;
 	explosion.firstFrame = worldFrame;
 	soundExplode();
+	showStats();
 }
 
 void calculateKillCollisions(FloatingObject& a, FloatingObject& b) {
@@ -255,7 +278,6 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 
 	++worldFrame;
 
-
 	if (0 == worldFrame % 200) {
 		placeAsteroid(3);
 	}
@@ -269,6 +291,7 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 
 	accelerates = pressedButtons[Accelerate];
 	if (accelerates && playerAlive) {
+		++stats.fuel;
 		auto velVector = directionVector;
 		scaleDoublePoint(velVector, accScale);
 		player.f.vel.x += velVector.x;
@@ -318,6 +341,7 @@ Uint32 tickFrame(Uint32 interval, void* param) {
 		for (; aPtr < asteroids.end(); ++aPtr) {
 			if (bulletCollides(*bPtr, *aPtr)) {
 				bulletHit = true;
+				++stats.hits;
 				soundCrack();
 				break;
 			}
@@ -513,6 +537,7 @@ void renderFrame() {
 void soundShot();
 
 void triggerFire() {
+	++stats.shots;
 	Bullet b;
 	b.lifetime = 100;
 	b.f = player.f;
@@ -665,6 +690,7 @@ void initExplosion() {
 }
 
 void newGame() {
+	stats = {};
 	worldFrame = 0;
 	nextFireFrame = -1;
 	playerAlive = true;
@@ -708,7 +734,7 @@ void soundExplode() {
 
 Mix_Chunk* loadSound(const char* path) {
 	auto chunk = Mix_LoadWAV(path);
-	if (nullptr == shotWav) {
+	if (nullptr == chunk) {
 		cout << "Mix_LoadWAV: " << SDL_GetError() << " for path "<<path<< endl;
 	}
 
@@ -751,6 +777,8 @@ int main(int argc, char* argv[])
 	initFlame();
 	initExplosion();
 
+	cout << "SPACE - restart game" << endl;
+
 	runNewGame = true;
 
 	if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
@@ -765,8 +793,6 @@ int main(int argc, char* argv[])
 	}
 
 	int registeredTimer = SDL_AddTimer(15, tickFrame, nullptr);
-	cout << "Registered timer at: " << registeredTimer << endl;
-	
 	window = SDL_CreateWindow("Example", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (int)SCREEN_WIDTH, (int)SCREEN_HEIGHT, 0);
 
 	if (nullptr == window) {
@@ -808,7 +834,7 @@ int main(int argc, char* argv[])
 				if (key == SDL_SCANCODE_ESCAPE) {
 					break;
 				}
-				else if (key == SDL_SCANCODE_SPACE) {
+				else if (key == SDL_SCANCODE_SPACE && e.type == SDL_KEYUP) {
 					runNewGame = true;
 				}
 				
